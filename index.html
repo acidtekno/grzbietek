@@ -91,6 +91,10 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 .reactbar{display:flex; justify-content:flex-start; gap:8px; margin-top:10px}
 .threadbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap}
 .threadbar .reactbar{margin-top:0}
+.tbleft{display:flex; align-items:center; gap:8px}
+.reorder{display:inline-flex; gap:4px}
+.robtn{font-family:var(--mono); font-weight:700; background:var(--ink); color:#000; border:2px solid var(--ink); width:28px; height:28px; line-height:1; cursor:pointer; font-size:13px; padding:0}
+.robtn:active{transform:translate(1px,1px)}
 .rbtn{display:inline-flex; align-items:center; gap:6px; background:transparent; color:var(--ink); border:2px solid var(--ink); padding:4px 10px; font-family:var(--mono); font-weight:700; font-size:12px; cursor:pointer}
 .rbtn:active{transform:translate(1px,1px)}
 .rbtn.on{background:var(--ink); color:#000}
@@ -369,10 +373,10 @@ function mediaEmbeds(raw){
     if(seen.has(url)) continue; seen.add(url);
     const yt=ytId(url);
     if(yt){
-      html+=`<div class="embed ytf" data-yt="${esc(yt)}"><div class="thumb" style="background-image:url('https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg')"></div><button class="playbtn" type="button">► ODTWÓRZ</button></div>`;
+      html+=`<div class="embed ytf" data-yt="${esc(yt)}"><div class="thumb" style="background-image:url('https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg')"></div><button class="playbtn" type="button">► PAL TO GÓWNO</button></div>`;
     }else{
       const su=scUrl(url);
-      if(su) html+=`<div class="embed scf" data-sc="${encodeURIComponent(su)}"><button class="playbtn" type="button">► SOUNDCLOUD — ODTWÓRZ</button></div>`;
+      if(su) html+=`<div class="embed scf" data-sc="${encodeURIComponent(su)}"><button class="playbtn" type="button">► SOUNDCLOUD — PAL TO GÓWNO</button></div>`;
     }
   }
   return html;
@@ -397,7 +401,7 @@ if(!SUPABASE_URL.startsWith("http") || SUPABASE_ANON_KEY.length<20){
 }
 
 /* ===================== STAN ===================== */
-let user=null, profile=null, adminMode=false, isReg=false, settings={threads_locked:false};
+let user=null, profile=null, adminMode=false, isReg=false, settings={threads_locked:false,thread_order:[]}, displayOrder=[];
 let booted=false, chatSub=null, canGrz=false, canMorda=false;
 
 /* ===================== ROUTING WIDOKÓW ===================== */
@@ -611,6 +615,15 @@ async function loadThreads(){
     return;
   }
   if(!data.length){ list.innerHTML=`<p class="muted center" style="margin-top:20px">Jeszcze nie ma wątków. Zacznij pierwszy.</p>`; return; }
+  // kolejnosc ustawiona przez admina (globalna): nowe watki na gorze, potem ustawione recznie
+  const order = Array.isArray(settings.thread_order) ? settings.thread_order : [];
+  if(order.length){
+    const inOrder = new Set(order);
+    const news = data.filter(t=>!inOrder.has(t.id));
+    const ordered = order.map(id=>data.find(t=>t.id===id)).filter(Boolean);
+    data = news.concat(ordered);
+  }
+  displayOrder = data.map(t=>t.id);
   let activeSet=new Set(), reMap={};
   try{
     const since=new Date(Date.now()-3*24*3600*1000).toISOString();
@@ -637,7 +650,10 @@ async function loadThreads(){
       <div class="body">${bodyHtml}</div>
       ${t.image_url?`<a href="${esc(t.image_url)}" target="_blank" rel="noopener"><img class="timg" src="${esc(t.image_url)}" alt="" loading="lazy"></a>`:""}
       <div class="threadbar">
-        <button class="btn ghost sm" data-open="${t.id}">KOMENTARZE / ODPOWIEDZ</button>
+        <div class="tbleft">
+          ${adminMode?`<span class="reorder"><button class="robtn" data-mv="up" data-id="${t.id}" title="W górę">▲</button><button class="robtn" data-mv="down" data-id="${t.id}" title="W dół">▼</button></span>`:""}
+          <button class="btn ghost sm" data-open="${t.id}">KOMENTARZE / ODPOWIEDZ</button>
+        </div>
         <div class="reactbar" id="react-${t.id}">${reactBarHtml(t.id, reMap[t.id])}</div>
       </div>
       <div class="comments hide" id="c-${t.id}"></div>`;
@@ -645,6 +661,7 @@ async function loadThreads(){
   }
   list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delThread(b.dataset.del));
   list.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>toggleComments(b.dataset.open));
+  list.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveThread(Number(b.dataset.id), b.dataset.mv==="up"?-1:1));
   bindReactBar(list);
   list.querySelectorAll("[data-more]").forEach(a=>a.onclick=(e)=>{
     e.preventDefault();
@@ -654,6 +671,16 @@ async function loadThreads(){
     body.querySelector(".short").classList.toggle("hide", !expanded);
     a.textContent = expanded ? "rozwiń" : "zwiń";
   });
+}
+async function moveThread(id, dir){
+  const ids = displayOrder.slice();
+  const i = ids.indexOf(id); if(i<0) return;
+  const j = i + dir; if(j<0 || j>=ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  const {error}=await sb.from("settings").update({thread_order: ids}).eq("id",1);
+  if(error){ toast(friendlyErr(error)); return; }
+  settings.thread_order = ids; displayOrder = ids;
+  loadThreads();
 }
 async function delThread(id){
   if(!confirm("Usunąć ten wątek?")) return;
@@ -786,13 +813,13 @@ async function loadMessages(){
 /* ===================== TRYB ADMINA ===================== */
 async function enterAdmin(){
   if(adminMode){ // wyjscie
-    adminMode=false; renderUserbar(); toast("Tryb admina wyłączony."); return;
+    adminMode=false; renderUserbar(); loadThreads(); toast("Tryb admina wyłączony."); return;
   }
   const pass=prompt("Potwierdź hasło, żeby wejść w tryb admina:");
   if(pass===null) return;
   const {error}=await sb.auth.signInWithPassword({email:user.email,password:pass});
   if(error){ toast("Błędne hasło."); return; }
-  adminMode=true; renderUserbar(); openAdminPanel();
+  adminMode=true; renderUserbar(); loadThreads(); openAdminPanel();
 }
 
 function openAdminPanel(){
