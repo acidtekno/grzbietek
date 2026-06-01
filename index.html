@@ -77,6 +77,17 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 @keyframes bulbpulse{0%,100%{opacity:.4}50%{opacity:1}}
 .timg{display:block; max-width:240px; max-height:200px; width:auto; height:auto; border:2px solid var(--ink); margin:10px 0 4px; cursor:zoom-in}
 .cimg{display:block; max-width:160px; max-height:130px; width:auto; height:auto; border:2px solid var(--ink); margin:6px 0 2px; cursor:zoom-in}
+.embed{margin:10px 0; max-width:480px}
+.ytf{position:relative; aspect-ratio:16/9; border:2px solid var(--ink); cursor:pointer; background:#000; overflow:hidden}
+.ytf .thumb{position:absolute; inset:0; background-size:cover; background-position:center; opacity:.85}
+.ytf .playbtn{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:2}
+.ytf.playing{cursor:default}
+.ytf.playing iframe{position:absolute; inset:0; width:100%; height:100%; border:0; display:block}
+.scf .playbtn{width:100%; text-align:center}
+.scf.playing iframe{display:block; width:100%; height:120px; border:2px solid var(--ink)}
+.playbtn{font-family:var(--mono); font-weight:700; font-size:13px; letter-spacing:1px; background:var(--ink); color:#000; border:2px solid var(--ink); padding:8px 14px; cursor:pointer; text-transform:uppercase}
+.playbtn:active{transform:translate(-50%,-50%) translate(1px,1px)}
+.scf .playbtn:active{transform:translate(1px,1px)}
 .reactbar{display:flex; justify-content:flex-start; gap:8px; margin-top:10px}
 .threadbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap}
 .threadbar .reactbar{margin-top:0}
@@ -322,6 +333,51 @@ async function shrinkImage(file, maxBytes){
   if(!blob) return file;
   const base=(file.name||"foto").replace(/\.[^.]+$/,"")||"foto";
   return new File([blob], base+".jpg", {type:"image/jpeg"});
+}
+// Zamienia adresy URL w tekscie na klikalne linki (bezpiecznie, z escapowaniem).
+function linkify(raw){
+  const text=raw||""; const re=/(https?:\/\/[^\s<]+)/g;
+  let out="", last=0, m;
+  while((m=re.exec(text))){
+    out+=esc(text.slice(last,m.index));
+    let url=m[0], trail="";
+    const mt=url.match(/[)\].,;!?]+$/);
+    if(mt){ trail=url.slice(url.length-mt[0].length); url=url.slice(0,url.length-mt[0].length); }
+    out+=`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`+esc(trail);
+    last=m.index+m[0].length;
+  }
+  out+=esc(text.slice(last));
+  return out;
+}
+function ytId(url){
+  const m=url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m?m[1]:null;
+}
+// Zwraca HTML z "miniaturami" YouTube/SoundCloud; player wstawia sie po kliknieciu (bindEmbeds).
+function mediaEmbeds(raw){
+  const text=raw||""; const re=/(https?:\/\/[^\s<]+)/g;
+  let html="", m; const seen=new Set();
+  while((m=re.exec(text))){
+    let url=m[0].replace(/[)\].,;!?]+$/,"");
+    if(seen.has(url)) continue; seen.add(url);
+    const yt=ytId(url);
+    if(yt){
+      html+=`<div class="embed ytf" data-yt="${esc(yt)}"><div class="thumb" style="background-image:url('https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg')"></div><button class="playbtn" type="button">► ODTWÓRZ</button></div>`;
+    }else if(/soundcloud\.com\//.test(url) && !/w\.soundcloud\.com/.test(url)){
+      html+=`<div class="embed scf" data-sc="${encodeURIComponent(url)}"><button class="playbtn" type="button">► SOUNDCLOUD — ODTWÓRZ</button></div>`;
+    }
+  }
+  return html;
+}
+function embedYt(id){ return `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&playsinline=1&rel=0" title="YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`; }
+function embedSc(enc){ return `<iframe src="https://w.soundcloud.com/player/?url=${enc}&auto_play=true&color=%23111111&hide_related=true&show_comments=false&show_user=true&show_reposts=false&visual=false" title="SoundCloud" scrolling="no" frameborder="no" allow="autoplay"></iframe>`; }
+function bindEmbeds(container){
+  container.querySelectorAll(".ytf").forEach(el=>{
+    const b=el.querySelector(".playbtn"); if(b) b.onclick=()=>{ el.classList.add("playing"); el.innerHTML=embedYt(el.dataset.yt); };
+  });
+  container.querySelectorAll(".scf").forEach(el=>{
+    const b=el.querySelector(".playbtn"); if(b) b.onclick=()=>{ el.classList.add("playing"); el.innerHTML=embedSc(el.dataset.sc); };
+  });
 }
 
 if(!SUPABASE_URL.startsWith("http") || SUPABASE_ANON_KEY.length<20){
@@ -627,7 +683,8 @@ async function renderComments(id, box){
       <div class="meta">${esc(c.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(c.created_at)}
       ${c.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${c.morda_only?'<span class="badge m">MORDA</span>':''}
       ${canDel?`<a href="#" data-delc="${c.id}" style="color:var(--danger)"> [usuń]</a>`:""}</div>
-      <div>${esc(c.body)}</div>
+      <div>${linkify(c.body)}</div>
+      ${mediaEmbeds(c.body)}
       ${c.image_url?`<a href="${esc(c.image_url)}" target="_blank" rel="noopener"><img class="cimg" src="${esc(c.image_url)}" alt="" loading="lazy"></a>`:""}
       <div class="reactbar" id="creact-${c.id}">${reactBarHtml(c.id, cmap[c.id], 'c')}</div></div>`;
   });
@@ -639,6 +696,7 @@ async function renderComments(id, box){
       ${canMorda?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cm-${id}"> Tylko dla MORDA</label>`:""}`;
   box.innerHTML=h;
   bindReactBar(box);
+  bindEmbeds(box);
   box.querySelector("[data-addc]").onclick=async()=>{
     const v=box.querySelector("#ci-"+id).value.trim(); if(!v) return;
     const lim=commentLimit();
