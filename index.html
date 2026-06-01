@@ -376,7 +376,7 @@ function mediaEmbeds(raw){
       html+=`<div class="embed ytf" data-yt="${esc(yt)}"><div class="thumb" style="background-image:url('https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg')"></div><button class="playbtn" type="button">► PAL TO GÓWNO</button></div>`;
     }else{
       const su=scUrl(url);
-      if(su) html+=`<div class="embed scf" data-sc="${encodeURIComponent(su)}"><button class="playbtn" type="button">► SOUNDCLOUD — PAL TO GÓWNO</button></div>`;
+      if(su) html+=`<div class="embed scf" data-sc="${encodeURIComponent(su)}"><button class="playbtn" type="button">► PAL TO GÓWNO</button></div>`;
     }
   }
   return html;
@@ -681,6 +681,7 @@ async function moveThread(id, dir){
   if(error){ toast(friendlyErr(error)); return; }
   settings.thread_order = ids; displayOrder = ids;
   loadThreads();
+  if($("#amThreads")) amLoadThreads();
 }
 async function delThread(id){
   if(!confirm("Usunąć ten wątek?")) return;
@@ -881,11 +882,21 @@ async function amUpd(id,patch){
   toast("Zapisano."); amLoadUsers();
 }
 async function amLoadThreads(){
-  const {data}=await sb.from("threads").select("id,title,grz_only,morda_only,profiles!author_id(nick)").order("created_at",{ascending:false});
+  let {data}=await sb.from("threads").select("id,title,grz_only,morda_only,profiles!author_id(nick)").order("created_at",{ascending:false});
+  data=data||[];
+  const order = Array.isArray(settings.thread_order) ? settings.thread_order : [];
+  if(order.length){
+    const inOrder=new Set(order);
+    const news=data.filter(t=>!inOrder.has(t.id));
+    const ordered=order.map(id=>data.find(t=>t.id===id)).filter(Boolean);
+    data=news.concat(ordered);
+  }
+  displayOrder=data.map(t=>t.id);
   const box=$("#amThreads"); if(!box) return;
-  box.innerHTML=(data||[]).map(t=>`<div class="urow" style="flex-direction:column;align-items:stretch">
+  box.innerHTML=(data).map(t=>`<div class="urow" style="flex-direction:column;align-items:stretch">
     <div class="row" style="justify-content:space-between">
       <span class="nm">${esc(t.title)} ${t.grz_only?'<span class="badge g">grzbietek</span>':''}${t.morda_only?'<span class="badge m">morda</span>':''} <span class="muted">— ${esc(t.profiles?.nick||"?")}</span></span>
+      <span class="reorder"><button class="robtn" data-mv="up" data-id="${t.id}" title="W górę">▲</button><button class="robtn" data-mv="down" data-id="${t.id}" title="W dół">▼</button></span>
     </div>
     <div class="row" style="margin-top:6px">
       <button class="btn sm ghost" data-tgrz="${t.id}" data-v="${t.grz_only?0:1}">${t.grz_only?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
@@ -895,6 +906,7 @@ async function amLoadThreads(){
     </div>
     <div class="hide" id="amc-${t.id}" style="margin-top:6px"></div>
   </div>`).join("") || `<p class="muted">Brak.</p>`;
+  box.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveThread(Number(b.dataset.id), b.dataset.mv==="up"?-1:1));
   box.querySelectorAll("[data-dt]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Usunąć wątek?")) return;
     await sb.from("threads").delete().eq("id",b.dataset.dt); toast("Usunięto."); amLoadThreads(); loadThreads();
