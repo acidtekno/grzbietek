@@ -75,8 +75,11 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 .thread .body .more{font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-dim); cursor:pointer}
 .bulb{display:inline-block; width:15px; height:15px; vertical-align:-2px; margin-left:5px; color:var(--ink); filter:drop-shadow(0 0 3px rgba(244,241,232,.55)); animation:bulbpulse 1.8s ease-in-out infinite}
 @keyframes bulbpulse{0%,100%{opacity:.4}50%{opacity:1}}
-.timg{display:block; max-width:100%; border:2px solid var(--ink); margin:10px 0 4px}
-.reactbar{display:flex; gap:8px; margin-top:10px}
+.timg{display:block; max-width:240px; max-height:200px; width:auto; height:auto; border:2px solid var(--ink); margin:10px 0 4px; cursor:zoom-in}
+.cimg{display:block; max-width:160px; max-height:130px; width:auto; height:auto; border:2px solid var(--ink); margin:6px 0 2px; cursor:zoom-in}
+.reactbar{display:flex; justify-content:flex-start; gap:8px; margin-top:10px}
+.threadbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap}
+.threadbar .reactbar{margin-top:0}
 .rbtn{display:inline-flex; align-items:center; gap:6px; background:transparent; color:var(--ink); border:2px solid var(--ink); padding:4px 10px; font-family:var(--mono); font-weight:700; font-size:12px; cursor:pointer}
 .rbtn:active{transform:translate(1px,1px)}
 .rbtn.on{background:var(--ink); color:#000}
@@ -443,7 +446,7 @@ $("#addThread").addEventListener("click", async ()=>{
   const file=$("#ntImage").files[0];
   if(file){
     if(!file.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
-    if(file.size>5*1024*1024){ toast("Zdjęcie za duże (max 5 MB)."); return; }
+    if(file.size>2*1024*1024){ toast("Zdjęcie za duże (max 2 MB). Wybierz mniejsze."); return; }
     $("#addThread").disabled=true; toast("Wgrywam zdjęcie...");
     const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
     const path=`${user.id}/${Date.now()}.${ext}`;
@@ -452,7 +455,9 @@ $("#addThread").addEventListener("click", async ()=>{
     if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
     image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
   }
-  const {data,error}=await sb.from("threads").insert({author_id:user.id,title,body,grz_only,morda_only,image_url}).select("grz_only,morda_only").single();
+  const tpayload={author_id:user.id,title,body,grz_only,morda_only};
+  if(image_url) tpayload.image_url=image_url;
+  const {data,error}=await sb.from("threads").insert(tpayload).select("grz_only,morda_only").single();
   if(error){ toast(friendlyErr(error)); return; }
   $("#ntTitle").value=""; $("#ntBody").value=""; $("#ntGrz").checked=false; $("#ntMorda").checked=false; $("#ntImage").value="";
   const tag = data?.grz_only&&data?.morda_only ? " — GRZBIETEK + MORDA" : data?.grz_only ? " — TYLKO GRZBIETEK" : data?.morda_only ? " — TYLKO MORDA" : "";
@@ -540,9 +545,11 @@ async function loadThreads(){
       <h3 data-open="${t.id}">${esc(t.title)} ${t.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${t.morda_only?'<span class="badge m">MORDA</span>':''}${activeSet.has(t.id)?BULB:''}</h3>
       <div class="meta">${esc(t.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(t.created_at)}</div>
       <div class="body">${bodyHtml}</div>
-      ${t.image_url?`<img class="timg" src="${esc(t.image_url)}" alt="" loading="lazy">`:""}
-      <div class="reactbar" id="react-${t.id}">${reactBarHtml(t.id, reMap[t.id])}</div>
-      <button class="btn ghost sm" data-open="${t.id}">KOMENTARZE / ODPOWIEDZ</button>
+      ${t.image_url?`<a href="${esc(t.image_url)}" target="_blank" rel="noopener"><img class="timg" src="${esc(t.image_url)}" alt="" loading="lazy"></a>`:""}
+      <div class="threadbar">
+        <button class="btn ghost sm" data-open="${t.id}">KOMENTARZE / ODPOWIEDZ</button>
+        <div class="reactbar" id="react-${t.id}">${reactBarHtml(t.id, reMap[t.id])}</div>
+      </div>
       <div class="comments hide" id="c-${t.id}"></div>`;
     list.appendChild(el);
   }
@@ -571,9 +578,14 @@ async function toggleComments(id){
   await renderComments(id, box);
 }
 async function renderComments(id, box){
-  const {data}=await sb.from("comments")
-    .select("id,body,created_at,author_id,grz_only,morda_only,profiles!author_id(nick)")
+  let {data,error}=await sb.from("comments")
+    .select("id,body,created_at,author_id,grz_only,morda_only,image_url,profiles!author_id(nick)")
     .eq("thread_id",id).order("created_at",{ascending:true});
+  if(error){
+    ({data}=await sb.from("comments")
+      .select("id,body,created_at,author_id,grz_only,morda_only,profiles!author_id(nick)")
+      .eq("thread_id",id).order("created_at",{ascending:true}));
+  }
   let cmap={};
   try{
     const cids=(data||[]).map(c=>c.id);
@@ -590,11 +602,13 @@ async function renderComments(id, box){
       ${c.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${c.morda_only?'<span class="badge m">MORDA</span>':''}
       ${canDel?`<a href="#" data-delc="${c.id}" style="color:var(--danger)"> [usuń]</a>`:""}</div>
       <div>${esc(c.body)}</div>
+      ${c.image_url?`<a href="${esc(c.image_url)}" target="_blank" rel="noopener"><img class="cimg" src="${esc(c.image_url)}" alt="" loading="lazy"></a>`:""}
       <div class="reactbar" id="creact-${c.id}">${reactBarHtml(c.id, cmap[c.id], 'c')}</div></div>`;
   });
   h+=`<div class="row" style="margin-top:8px">
       <input id="ci-${id}" placeholder="Odpowiedz..." style="flex:1" maxlength="2000">
       <button class="btn sm" data-addc="${id}">WYŚLIJ</button></div>
+      <label class="filepick" style="margin-top:6px">Zdjęcie (mini, opcjonalnie): <input type="file" id="cimg-${id}" accept="image/*"></label>
       ${canGrz?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cg-${id}"> Tylko dla GRZBIETEK</label>`:""}
       ${canMorda?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cm-${id}"> Tylko dla MORDA</label>`:""}`;
   box.innerHTML=h;
@@ -605,7 +619,23 @@ async function renderComments(id, box){
     if(await dailyCount("comments") >= lim){ toast(`Dzienny limit komentarzy osiągnięty (${lim}). Spróbuj za jakiś czas.`); return; }
     const grz_only = canGrz && box.querySelector("#cg-"+id)?.checked;
     const morda_only = canMorda && box.querySelector("#cm-"+id)?.checked;
-    const {error}=await sb.from("comments").insert({thread_id:Number(id),author_id:user.id,body:v,grz_only,morda_only});
+    // zdjęcie w komentarzu (mini, opcjonalne)
+    let image_url=null;
+    const cfile=box.querySelector("#cimg-"+id)?.files[0];
+    if(cfile){
+      if(!cfile.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
+      if(cfile.size>2*1024*1024){ toast("Zdjęcie za duże (max 2 MB). Wybierz mniejsze."); return; }
+      const btn=box.querySelector("[data-addc]"); if(btn) btn.disabled=true; toast("Wgrywam zdjęcie...");
+      const ext=(cfile.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const path=`comments/${user.id}/${Date.now()}.${ext}`;
+      const {error:upErr}=await sb.storage.from("thread-images").upload(path,cfile,{cacheControl:"3600",upsert:false});
+      if(btn) btn.disabled=false;
+      if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
+      image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
+    }
+    const cpayload={thread_id:Number(id),author_id:user.id,body:v,grz_only,morda_only};
+    if(image_url) cpayload.image_url=image_url;
+    const {error}=await sb.from("comments").insert(cpayload);
     if(error){
       if(/foreign key/i.test(error.message)){ toast("Ten wątek już nie istnieje — odświeżam listę."); loadThreads(); return; }
       toast(friendlyErr(error)); return;
