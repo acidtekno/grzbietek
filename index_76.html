@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GRZBIETEK</title>
+<link rel="icon" href="./logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============ MOTYW: czarno-bialy zine / soundsystem ============ */
+:root{
+  --bg:#0c0c0c; --ink:#f4f1e8; --ink-dim:#8a877e;
+  --line:#f4f1e8; --paper:#16150f; --danger:#ff3b30; --ok:#9be870;
+  --disp:'Anton',sans-serif; --mono:'Spline Sans Mono',monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--mono);
+  font-size:15px; line-height:1.5; min-height:100vh; padding-bottom:64px;
+  overflow-x:hidden;
+}
+/* ziarno jak z ksero */
+body::before{
+  content:""; position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.wrap{position:relative; z-index:2; max-width:780px; margin:0 auto; padding:0 14px}
+a{color:var(--ink)}
+button{font-family:var(--mono); cursor:pointer}
+h1,h2,h3{font-family:var(--disp); font-weight:400; letter-spacing:.5px; line-height:.95; text-transform:uppercase; margin:0}
+input,textarea{
+  font-family:var(--mono); font-size:15px; width:100%; background:#000; color:var(--ink);
+  border:2px solid var(--line); padding:11px 12px; outline:none;
+}
+input:focus,textarea:focus{box-shadow:3px 3px 0 var(--ink)}
+textarea{resize:vertical; min-height:84px}
+.btn{
+  display:inline-flex; align-items:center; gap:7px; justify-content:center;
+  background:var(--ink); color:#000; border:2px solid var(--ink); padding:9px 14px;
+  font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:13px;
+  text-decoration:none; transition:transform .05s;
+}
+.btn:active{transform:translate(2px,2px)}
+.btn.ghost{background:transparent; color:var(--ink)}
+.btn.danger{background:var(--danger); border-color:var(--danger); color:#000}
+.btn.sm{padding:5px 9px; font-size:11px}
+.btn[disabled]{opacity:.35; cursor:not-allowed}
+.muted{color:var(--ink-dim); font-size:12.5px}
+.card{border:2px solid var(--line); background:var(--paper); padding:14px; margin:12px 0}
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+.hide{display:none !important}
+
+/* ============ NAGLOWEK ============ */
+header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relative; z-index:2}
+.brand{display:flex; align-items:center; gap:12px}
+.brand img{width:54px; height:54px; object-fit:contain; background:#000; border:2px solid var(--ink); padding:3px}
+.brand h1{font-size:40px}
+.brand .tag{font-size:11px; color:var(--ink-dim); letter-spacing:3px; margin-top:2px}
+.topbtns{display:flex; gap:8px; flex-wrap:wrap; margin-top:11px}
+.userbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:13px}
+.tabs{display:flex; gap:0; margin-top:12px; border:2px solid var(--ink)}
+.tabs button{flex:1; background:transparent; color:var(--ink); border:0; border-right:2px solid var(--ink);
+  padding:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; font-size:13px}
+.tabs button:last-child{border-right:0}
+.tabs button.on{background:var(--ink); color:#000}
+
+/* ============ WATKI ============ */
+.thread{border:2px solid var(--line); background:var(--paper); padding:13px; margin:11px 0; position:relative}
+.thread h3{font-size:21px; margin-bottom:4px; cursor:pointer}
+.thread .meta{font-size:11px; color:var(--ink-dim); letter-spacing:1px; text-transform:uppercase}
+.thread .body{margin:8px 0; white-space:pre-wrap; word-break:break-word}
+.thread .body .more{font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-dim); cursor:pointer}
+.bulb{display:inline-block; width:15px; height:15px; vertical-align:-2px; margin-left:5px; color:var(--ink); filter:drop-shadow(0 0 3px rgba(244,241,232,.55)); animation:bulbpulse 1.8s ease-in-out infinite}
+@keyframes bulbpulse{0%,100%{opacity:.4}50%{opacity:1}}
+.timg{display:block; max-width:100%; border:2px solid var(--ink); margin:10px 0 4px}
+.reactbar{display:flex; gap:8px; margin-top:10px}
+.rbtn{display:inline-flex; align-items:center; gap:6px; background:transparent; color:var(--ink); border:2px solid var(--ink); padding:4px 10px; font-family:var(--mono); font-weight:700; font-size:12px; cursor:pointer}
+.rbtn:active{transform:translate(1px,1px)}
+.rbtn.on{background:var(--ink); color:#000}
+.rbtn svg{width:14px; height:14px; display:block}
+.filepick{display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.5px}
+.filepick input{width:auto}
+.comment{border-left:3px solid var(--ink); padding:6px 10px; margin:8px 0; background:#000}
+.comment .meta{font-size:10.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:1px}
+.delx{position:absolute; top:8px; right:10px}
+
+/* ============ CZAT (pasek na dole) ============ */
+#chatbar{position:fixed; left:0; right:0; bottom:0; z-index:30; background:#000; border-top:3px solid var(--ink)}
+#chatbar .head{display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer}
+#chatbar .head .lbl{font-family:var(--disp); font-size:17px}
+#chatbar .head .latest{flex:1; color:var(--ink-dim); font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#chatbar .head .chev{transition:transform .15s}
+#chatbar.open .head .chev{transform:rotate(180deg)}
+#chatbody{display:none; flex-direction:column; height:min(56vh,420px)}
+#chatbar.open #chatbody{display:flex}
+#chatlist{flex:1; overflow-y:auto; padding:10px 14px}
+.msg{margin:7px 0; word-break:break-word}
+.msg .who{font-weight:700; color:var(--ink)}
+.msg .me .who{color:var(--ok)}
+.msg time{color:var(--ink-dim); font-size:10px; margin-left:6px}
+.msg .x{color:var(--danger); margin-left:8px; cursor:pointer; font-size:11px}
+#chatform{display:flex; gap:8px; padding:10px 14px; border-top:2px solid var(--ink)}
+
+/* ============ SOUNDSYSTEM ============ */
+.palette{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0}
+.palette .pc{border:2px solid var(--ink); padding:7px 10px; font-size:12px; text-transform:uppercase; letter-spacing:.5px;
+  background:transparent; color:var(--ink); display:flex; flex-direction:column; align-items:flex-start; min-width:96px}
+.palette .pc b{font-family:var(--disp); font-size:16px; letter-spacing:1px}
+.palette .pc small{color:var(--ink-dim)}
+.palette .pc[disabled]{opacity:.3}
+#board{position:relative; border:2px solid var(--ink); background:
+   repeating-linear-gradient(0deg,transparent 0 27px,rgba(244,241,232,.06) 27px 28px),
+   repeating-linear-gradient(90deg,transparent 0 27px,rgba(244,241,232,.06) 27px 28px),
+   #000;
+  height:460px; overflow:auto; touch-action:none; margin-top:4px}
+#ground{position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--ink); opacity:.5}
+.block{position:absolute; border:2px solid #000; box-shadow:2px 2px 0 rgba(0,0,0,.6);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  touch-action:none; user-select:none; cursor:grab; overflow:hidden}
+.block:active{cursor:grabbing}
+.block .bt{font-family:var(--disp); font-size:14px; line-height:1; letter-spacing:.5px}
+.block .bd{font-size:9px; opacity:.8}
+.block .rm{position:absolute; top:-2px; right:-2px; background:var(--danger); color:#000;
+  width:18px; height:18px; line-height:16px; text-align:center; font-weight:700; border:2px solid #000}
+.block .rot{position:absolute; top:-2px; left:-2px; background:var(--ink); color:#000;
+  width:18px; height:18px; line-height:15px; text-align:center; font-weight:700; border:2px solid #000; font-size:13px}
+
+/* ============ MODAL / PANEL ADMINA ============ */
+.overlay{position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.85); display:flex;
+  align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto}
+.modal{background:var(--bg); border:3px solid var(--ink); max-width:640px; width:100%; padding:18px; margin:auto}
+.modal h2{font-size:26px; margin-bottom:10px}
+.urow{display:flex; align-items:center; gap:8px; flex-wrap:wrap; border:2px solid var(--line); padding:9px; margin:8px 0; background:var(--paper)}
+.urow .nm{flex:1; min-width:120px; font-weight:700}
+.badge{font-size:10px; border:1px solid var(--ink-dim); color:var(--ink-dim); padding:1px 5px; text-transform:uppercase; letter-spacing:1px}
+.badge.b{border-color:var(--danger); color:var(--danger)}
+.badge.g{background:var(--ink); color:#000; border-color:var(--ink); font-weight:700}
+.badge.m{background:transparent; color:var(--ink); border:2px solid var(--ink); font-weight:700}
+.grzcheck{display:flex; align-items:center; gap:8px; font-size:13px; text-transform:uppercase; letter-spacing:.5px; cursor:pointer}
+.grzcheck input{width:auto; margin:0}
+
+/* ============ TOAST + BANNER ============ */
+#toast{position:fixed; left:50%; bottom:78px; transform:translateX(-50%); z-index:99;
+  background:var(--ink); color:#000; padding:10px 16px; font-weight:700; max-width:90%;
+  text-align:center; display:none; border:2px solid #000}
+#cfgbanner{background:var(--danger); color:#000; padding:10px 14px; font-weight:700; text-align:center; font-size:13px}
+.banner-info{background:#000;border:2px solid var(--danger);color:var(--danger);padding:10px;margin:12px 0;font-size:13px;font-weight:700;text-align:center}
+.center{text-align:center}
+.spacer{height:18px}
+</style>
+</head>
+<body>
+
+<div id="cfgbanner" class="hide"></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <img src="./logo.jpg" alt="Grzbietek">
+      <div>
+        <h1>GRZBIETEK</h1>
+        <div class="tag">SOUNDSYSTEM • SPOŁECZNOŚĆ</div>
+      </div>
+    </div>
+    <div class="topbtns">
+      <a class="btn" id="fbBtn" target="_blank" rel="noopener">★ FACEBOOK</a>
+      <button class="btn ghost" data-tab="sound">▣ SOUNDSYSTEM</button>
+    </div>
+    <div class="userbar" id="userbar"></div>
+    <div class="tabs hide" id="tabs">
+      <button data-tab="threads" class="on">WĄTKI</button>
+      <button data-tab="sound">SOUNDSYSTEM</button>
+    </div>
+  </header>
+
+  <!-- ===== LOGOWANIE ===== -->
+  <section id="view-auth">
+    <div class="card center" style="margin-top:26px">
+      <h2 id="authTitle">WCHODZISZ?</h2>
+      <p class="muted">Załóż konto albo zaloguj się, żeby pisać.</p>
+      <div class="spacer"></div>
+      <div id="regFields">
+        <input id="rNick" placeholder="Twój nick (widoczny publicznie)" maxlength="24" autocomplete="off">
+        <div class="spacer"></div>
+      </div>
+      <input id="aEmail" type="email" placeholder="e-mail" autocomplete="email">
+      <div class="spacer"></div>
+      <input id="aPass" type="password" placeholder="hasło (min. 6 znaków)" autocomplete="current-password">
+      <div class="spacer"></div>
+      <button class="btn" id="doAuth" style="width:100%">ZALOGUJ</button>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="switchMode">Nie masz konta? Załóż →</button>
+    </div>
+  </section>
+
+  <!-- ===== WATKI ===== -->
+  <section id="view-threads" class="hide">
+    <div class="card" id="newThreadCard">
+      <div class="row" style="justify-content:space-between">
+        <h3>NOWY WĄTEK</h3>
+        <button class="btn sm" id="ntToggle">+ DODAJ</button>
+      </div>
+      <div id="ntForm" class="hide">
+        <div class="spacer"></div>
+        <input id="ntTitle" placeholder="Tytuł (max 23 znaki)" maxlength="23">
+        <div class="spacer"></div>
+        <textarea id="ntBody" placeholder="Co masz do powiedzenia?" maxlength="5000"></textarea>
+        <div class="spacer"></div>
+        <label class="filepick">Zdjęcie (opcjonalnie): <input type="file" id="ntImage" accept="image/*"></label>
+        <div class="spacer"></div>
+        <label id="ntGrzWrap" class="grzcheck hide"><input type="checkbox" id="ntGrz"> Widoczny tylko dla GRZBIETEK</label>
+        <label id="ntMordaWrap" class="grzcheck hide"><input type="checkbox" id="ntMorda"> Widoczny tylko dla MORDA</label>
+        <div class="spacer"></div>
+        <button class="btn" id="addThread">DODAJ WĄTEK</button>
+      </div>
+    </div>
+    <div id="lockedNote" class="banner-info hide">Dodawanie wątków jest teraz tylko dla admina.</div>
+    <div id="threadList"></div>
+  </section>
+
+  <!-- ===== SOUNDSYSTEM ===== -->
+  <section id="view-sound" class="hide">
+    <div class="spacer"></div>
+    <h2>UKŁADANKA SOUNDSYSTEMU</h2>
+    <p class="muted">Widok z frontu, w skali. Dotknij klocka w palecie, żeby dodać. Przeciągaj, żeby ustawiać — klocki nie nachodzą na siebie. ⟳ obraca o 90°, × usuwa.</p>
+    <div class="palette" id="palette"></div>
+    <div id="board"><div id="ground"></div></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" id="ssClear">WYCZYŚĆ</button>
+      <button class="btn sm" id="ssSave">ZAPISZ</button>
+      <button class="btn sm ghost" id="ssSaveNew">ZAPISZ JAKO NOWY</button>
+      <button class="btn sm ghost" id="ssLoad">WCZYTAJ ZAPISANE</button>
+      <span class="muted" id="ssCurrent"></span>
+    </div>
+  </section>
+
+  <div class="spacer"></div>
+</div>
+
+<!-- ===== CZAT ===== -->
+<div id="chatbar" class="hide">
+  <div class="head" id="chatHead">
+    <span class="lbl">CZAT</span>
+    <span class="latest" id="chatLatest">—</span>
+    <span class="chev">▲</span>
+  </div>
+  <div id="chatbody">
+    <div id="chatlist"></div>
+    <div id="chatform">
+      <input id="chatInput" placeholder="Napisz coś..." maxlength="500" autocomplete="off">
+      <button class="btn" id="chatSend">WYŚLIJ</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="modalRoot"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* =====================================================================
+   KONFIGURACJA  —  TU WKLEJASZ SWOJE DANE Z SUPABASE
+   Supabase -> Project Settings -> API
+   ===================================================================== */
+const SUPABASE_URL      = "https://frrbacobuofufysxqjrf.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_ueGcfTMceyOoCmkpPRebNg_XYbcORvF";
+
+const ADMIN_EMAIL  = "alemamkasy@gmail.com";
+const FACEBOOK_URL = "https://www.facebook.com/share/1KbkNgPZYw/";
+
+/* ===== KLOCKI SOUNDSYSTEMU (szerokość × wysokość × głębokość, cm) ===== */
+const INVENTORY = { Bassy:4, Betony:2, Horny:2, Usta:2 };
+const CABS = {
+  Bassy:  { w:120, h:70,  d:80, shade:"#ece8dc", fg:"#0c0c0c" },
+  Betony: { w:52,  h:105, d:70, shade:"#bcb7a8", fg:"#0c0c0c" },
+  Horny:  { w:75,  h:38,  d:70, shade:"#837e72", fg:"#f4f1e8" },
+  Usta:   { w:48,  h:20,  d:40, shade:"#54514a", fg:"#f4f1e8" },
+};
+const SCALE = 1.5; // px na cm
+
+/* ===================================================================== */
+document.getElementById("fbBtn").href = FACEBOOK_URL;
+let sb=null, configured=false;
+const $ = s => document.querySelector(s);
+const toastEl = $("#toast");
+function toast(m){ toastEl.textContent=m; toastEl.style.display="block"; clearTimeout(toast._t); toast._t=setTimeout(()=>toastEl.style.display="none",2600); }
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function timeStr(t){ const d=new Date(t); return d.toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); }
+function friendlyErr(e){
+  const m=(e&&e.message)||""; console.error("Grzbietek error:", m);
+  if(/row-level security|violates row-level/i.test(m)) return "Brak uprawnień albo osiągnięty limit.";
+  if(/foreign key/i.test(m)) return "Ten element już nie istnieje — odśwież stronę.";
+  if(/duplicate key|unique/i.test(m)) return "To już istnieje (np. zajęty nick).";
+  if(/check constraint|_len/i.test(m)) return "Treść jest za długa.";
+  return "Coś poszło nie tak. Spróbuj ponownie.";
+}
+
+if(!SUPABASE_URL.startsWith("http") || SUPABASE_ANON_KEY.length<20){
+  const b=$("#cfgbanner"); b.classList.remove("hide");
+  b.textContent="⚙ Wklej dane Supabase w pliku index.html (sekcja KONFIGURACJA), żeby strona zaczęła działać.";
+} else {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  configured = true;
+}
+
+/* ===================== STAN ===================== */
+let user=null, profile=null, adminMode=false, isReg=false, settings={threads_locked:false};
+let booted=false, chatSub=null, canGrz=false, canMorda=false;
+
+/* ===================== ROUTING WIDOKÓW ===================== */
+function show(view){
+  ["auth","threads","sound"].forEach(v=>$("#view-"+v).classList.toggle("hide", v!==view));
+  if($("#tabs")) [...document.querySelectorAll("#tabs button")].forEach(b=>b.classList.toggle("on", b.dataset.tab===view));
+}
+document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>{
+  const t=b.dataset.tab;
+  if(t==="sound"){ show("sound"); renderPalette(); }
+  else if(!user){ show("auth"); } else { show(t); }
+}));
+
+/* ===================== AUTH ===================== */
+$("#switchMode").addEventListener("click",()=>{
+  isReg=!isReg;
+  $("#regFields").classList.toggle("hide", !isReg);
+  $("#authTitle").textContent = isReg ? "ZAKŁADASZ KONTO" : "WCHODZISZ?";
+  $("#doAuth").textContent = isReg ? "ZAŁÓŻ KONTO" : "ZALOGUJ";
+  $("#switchMode").textContent = isReg ? "← Mam już konto, zaloguj" : "Nie masz konta? Załóż →";
+});
+$("#doAuth").addEventListener("click", doAuth);
+async function doAuth(){
+  if(!configured){ toast("Najpierw skonfiguruj Supabase."); return; }
+  const email=$("#aEmail").value.trim(), pass=$("#aPass").value;
+  if(!email||pass.length<6){ toast("Podaj e-mail i hasło (min. 6)."); return; }
+  $("#doAuth").disabled=true;
+  try{
+    if(isReg){
+      const nick=$("#rNick").value.trim();
+      if(nick.length<2){ toast("Podaj nick (min. 2 znaki)."); $("#doAuth").disabled=false; return; }
+      const reserved=["admin","grzbietek","morda","[użytkownik usunięty]"];
+      if(reserved.includes(nick.toLowerCase())){ toast("Ten nick jest zarezerwowany — wybierz inny."); $("#doAuth").disabled=false; return; }
+      try{ const {data:ok}=await sb.rpc("nick_available",{n:nick}); if(ok===false){ toast("Ten nick jest już zajęty — wybierz inny."); $("#doAuth").disabled=false; return; } }catch(e){}
+      const {error}=await sb.auth.signUp({email,password:pass,options:{data:{nick}}});
+      if(error) throw error;
+      toast("Konto założone! Loguję...");
+    }else{
+      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error) throw error;
+    }
+  }catch(e){ toast("Błąd: "+(e.message||e)); }
+  $("#doAuth").disabled=false;
+}
+
+async function loadProfile(){
+  const {data}=await sb.from("profiles").select("id,nick,is_admin,grzbietek,morda,deleted,created_at").eq("id",user.id).maybeSingle();
+  profile=data;
+  canGrz = !!(profile && (profile.grzbietek || profile.is_admin));
+  canMorda = !!(profile && (profile.morda || profile.is_admin));
+  let banned=false;
+  try{ const {data:b}=await sb.rpc("is_banned"); banned=!!b; }catch(e){}
+  if(banned){
+    toast("Zostałeś zbanowany.");
+    await sb.auth.signOut(); return false;
+  }
+  return true;
+}
+
+async function onSignedIn(sess){
+  user=sess.user;
+  const ok=await loadProfile();
+  if(!ok) return;
+  await loadSettings();
+  renderUserbar();
+  updateGrzUI();
+  $("#tabs").classList.remove("hide");
+  show("threads");
+  loadThreads();
+  initChat();
+}
+function updateGrzUI(){
+  $("#ntGrzWrap").classList.toggle("hide", !canGrz);
+  $("#ntMordaWrap").classList.toggle("hide", !canMorda);
+}
+function onSignedOut(){
+  user=null; profile=null; adminMode=false;
+  if(chatSub){ sb.removeChannel(chatSub); chatSub=null; }
+  $("#tabs").classList.add("hide");
+  $("#chatbar").classList.add("hide");
+  renderUserbar();
+  show("auth");
+}
+
+function renderUserbar(){
+  const ub=$("#userbar");
+  if(!user){ ub.innerHTML=""; return; }
+  let html=`<span>Cześć, <b>${esc(profile?.nick||"?")}</b>${profile?.grzbietek?' <span class="badge g">GRZBIETEK</span>':''}${profile?.morda?' <span class="badge m">MORDA</span>':''}</span>`;
+  if(profile?.is_admin){
+    html+=`<button class="btn sm ${adminMode?'danger':'ghost'}" id="adminBtn">${adminMode?'● TRYB ADMINA':'TRYB ADMINA'}</button>`;
+  }
+  html+=`<button class="btn sm ghost" id="logoutBtn">WYLOGUJ</button>`;
+  ub.innerHTML=html;
+  if(profile?.is_admin) $("#adminBtn").addEventListener("click", enterAdmin);
+  $("#logoutBtn").addEventListener("click", ()=>sb.auth.signOut());
+}
+
+/* ===================== USTAWIENIA ===================== */
+async function loadSettings(){
+  const {data}=await sb.from("settings").select("*").eq("id",1).maybeSingle();
+  if(data) settings=data;
+  applyLock();
+}
+function applyLock(){
+  const locked = settings.threads_locked && !profile?.is_admin;
+  $("#newThreadCard").classList.toggle("hide", locked);
+  $("#lockedNote").classList.toggle("hide", !locked);
+}
+
+/* ===================== WATKI ===================== */
+$("#ntToggle").addEventListener("click",()=>{
+  const f=$("#ntForm"), open=!f.classList.contains("hide");
+  f.classList.toggle("hide", open);
+  $("#ntToggle").textContent = open ? "+ DODAJ" : "ZWIŃ";
+});
+function threadLimit(){ return profile?.is_admin?Infinity:(profile?.grzbietek?5:3); }
+function commentLimit(){ return profile?.is_admin?Infinity:(profile?.grzbietek?30:10); }
+async function dailyCount(table){
+  const since=new Date(Date.now()-24*3600*1000).toISOString();
+  const {count}=await sb.from(table).select("id",{count:"exact",head:true}).eq("author_id",user.id).gte("created_at",since);
+  return count||0;
+}
+$("#addThread").addEventListener("click", async ()=>{
+  const title=$("#ntTitle").value.trim().slice(0,23), body=$("#ntBody").value.trim();
+  if(!title||!body){ toast("Wpisz tytuł i treść."); return; }
+  const lim=threadLimit();
+  if(await dailyCount("threads") >= lim){ toast(`Dzienny limit wątków osiągnięty (${lim}). Spróbuj za jakiś czas.`); return; }
+  const eligible = !!(profile && (profile.grzbietek || profile.is_admin));
+  const grz_only = eligible && $("#ntGrz").checked;
+  const morda_only = canMorda && $("#ntMorda").checked;
+  // zdjęcie (opcjonalne)
+  let image_url=null;
+  const file=$("#ntImage").files[0];
+  if(file){
+    if(!file.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
+    if(file.size>5*1024*1024){ toast("Zdjęcie za duże (max 5 MB)."); return; }
+    $("#addThread").disabled=true; toast("Wgrywam zdjęcie...");
+    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const path=`${user.id}/${Date.now()}.${ext}`;
+    const {error:upErr}=await sb.storage.from("thread-images").upload(path,file,{cacheControl:"3600",upsert:false});
+    $("#addThread").disabled=false;
+    if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
+    image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
+  }
+  const {data,error}=await sb.from("threads").insert({author_id:user.id,title,body,grz_only,morda_only,image_url}).select("grz_only,morda_only").single();
+  if(error){ toast(friendlyErr(error)); return; }
+  $("#ntTitle").value=""; $("#ntBody").value=""; $("#ntGrz").checked=false; $("#ntMorda").checked=false; $("#ntImage").value="";
+  const tag = data?.grz_only&&data?.morda_only ? " — GRZBIETEK + MORDA" : data?.grz_only ? " — TYLKO GRZBIETEK" : data?.morda_only ? " — TYLKO MORDA" : "";
+  toast("Wątek dodany"+tag+".");
+  $("#ntForm").classList.add("hide"); $("#ntToggle").textContent="+ DODAJ";
+  loadThreads();
+});
+
+const BULB='<svg class="bulb" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4.9 1 1 1.8l.1.8h4.8l.1-.8c.1-.8.4-1.4 1-1.8A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9.8 19.5h4.4M10.5 21.5h3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+const THUMB_UP='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>';
+const THUMB_DOWN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7 0h2.67A2.31 2.31 0 0 0 22 13V4a2.31 2.31 0 0 0-2.33-2H17"/></svg>';
+function reactBarHtml(id,r,kind){
+  r=r||{up:0,down:0,mine:0}; kind=kind||'t';
+  return `<button class="rbtn ${r.mine===1?'on':''}" data-react="1" data-id="${id}" data-kind="${kind}">${THUMB_UP} ${r.up}</button>
+          <button class="rbtn ${r.mine===-1?'on':''}" data-react="-1" data-id="${id}" data-kind="${kind}">${THUMB_DOWN} ${r.down}</button>`;
+}
+function bindReactBar(container){
+  container.querySelectorAll("[data-react]").forEach(b=>b.onclick=()=>doReact(b.dataset.kind, b.dataset.id, Number(b.dataset.react)));
+}
+function reactCfg(kind){
+  return kind==='c'
+    ? {table:"comment_reactions", idcol:"comment_id", pre:"creact-"}
+    : {table:"reactions",         idcol:"thread_id",  pre:"react-"};
+}
+async function loadReactGeneric(kind, id){
+  const c=reactCfg(kind);
+  const {data}=await sb.from(c.table).select("value,user_id").eq(c.idcol,id);
+  let up=0,down=0,mine=0;
+  (data||[]).forEach(x=>{ if(x.value===1)up++; else down++; if(x.user_id===user.id)mine=x.value; });
+  return {up,down,mine};
+}
+async function doReact(kind, id, value){
+  id=Number(id); const c=reactCfg(kind);
+  const cur=await loadReactGeneric(kind,id);
+  let err;
+  if(cur.mine===value){
+    ({error:err}=await sb.from(c.table).delete().eq(c.idcol,id).eq("user_id",user.id));
+  }else{
+    const row={user_id:user.id,value}; row[c.idcol]=id;
+    ({error:err}=await sb.from(c.table).upsert(row,{onConflict:c.idcol+",user_id"}));
+  }
+  if(err){ toast(friendlyErr(err)); return; }
+  const r=await loadReactGeneric(kind,id);
+  const el=document.getElementById(c.pre+id);
+  if(el){ el.innerHTML=reactBarHtml(id,r,kind); bindReactBar(el); }
+}
+async function loadThreads(){
+  let {data,error}=await sb.from("threads")
+    .select("id,title,body,created_at,author_id,grz_only,morda_only,image_url,profiles!author_id(nick)")
+    .order("created_at",{ascending:false});
+  if(error){
+    // np. kolumna image_url jeszcze nie istnieje — wczytaj bez niej
+    ({data,error}=await sb.from("threads")
+      .select("id,title,body,created_at,author_id,grz_only,morda_only,profiles!author_id(nick)")
+      .order("created_at",{ascending:false}));
+  }
+  const list=$("#threadList");
+  if(error){
+    console.error("Grzbietek loadThreads:", error);
+    list.innerHTML=`<p class="muted">Nie udało się wczytać wątków.<br><small style="color:var(--ink-dim)">Szczegóły: ${esc(error.message||error.code||"brak")}</small></p>`;
+    return;
+  }
+  if(!data.length){ list.innerHTML=`<p class="muted center" style="margin-top:20px">Jeszcze nie ma wątków. Zacznij pierwszy.</p>`; return; }
+  let activeSet=new Set(), reMap={};
+  try{
+    const since=new Date(Date.now()-3*24*3600*1000).toISOString();
+    const {data:rc}=await sb.from("comments").select("thread_id").gte("created_at",since);
+    activeSet=new Set((rc||[]).map(c=>c.thread_id));
+  }catch(e){}
+  try{
+    const ids=data.map(t=>t.id);
+    const {data:rs}=await sb.from("reactions").select("thread_id,value,user_id").in("thread_id",ids);
+    (rs||[]).forEach(r=>{ const mm=reMap[r.thread_id]||(reMap[r.thread_id]={up:0,down:0,mine:0}); if(r.value===1)mm.up++; else mm.down++; if(r.user_id===user.id)mm.mine=r.value; });
+  }catch(e){}
+  list.innerHTML="";
+  for(const t of data){
+    const mine=t.author_id===user.id, canDel=mine||profile?.is_admin;
+    const el=document.createElement("div"); el.className="thread";
+    const long = (t.body||"").length > 80;
+    const bodyHtml = long
+      ? `<span class="short">${esc(t.body.slice(0,80))}… </span><span class="full hide">${esc(t.body)} </span><a href="#" class="more" data-more="${t.id}">rozwiń</a>`
+      : esc(t.body);
+    el.innerHTML=`
+      ${canDel?`<button class="btn sm danger delx" data-del="${t.id}">USUŃ</button>`:""}
+      <h3 data-open="${t.id}">${esc(t.title)} ${t.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${t.morda_only?'<span class="badge m">MORDA</span>':''}${activeSet.has(t.id)?BULB:''}</h3>
+      <div class="meta">${esc(t.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(t.created_at)}</div>
+      <div class="body">${bodyHtml}</div>
+      ${t.image_url?`<img class="timg" src="${esc(t.image_url)}" alt="" loading="lazy">`:""}
+      <div class="reactbar" id="react-${t.id}">${reactBarHtml(t.id, reMap[t.id])}</div>
+      <button class="btn ghost sm" data-open="${t.id}">KOMENTARZE / ODPOWIEDZ</button>
+      <div class="comments hide" id="c-${t.id}"></div>`;
+    list.appendChild(el);
+  }
+  list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delThread(b.dataset.del));
+  list.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>toggleComments(b.dataset.open));
+  bindReactBar(list);
+  list.querySelectorAll("[data-more]").forEach(a=>a.onclick=(e)=>{
+    e.preventDefault();
+    const body=a.closest(".body");
+    const expanded=!body.querySelector(".full").classList.contains("hide");
+    body.querySelector(".full").classList.toggle("hide", expanded);
+    body.querySelector(".short").classList.toggle("hide", !expanded);
+    a.textContent = expanded ? "rozwiń" : "zwiń";
+  });
+}
+async function delThread(id){
+  if(!confirm("Usunąć ten wątek?")) return;
+  const {error}=await sb.from("threads").delete().eq("id",id);
+  if(error){ toast("Błąd: "+error.message); return; }
+  toast("Wątek usunięty."); loadThreads();
+}
+async function toggleComments(id){
+  const box=$("#c-"+id);
+  if(!box.classList.contains("hide")){ box.classList.add("hide"); return; }
+  box.classList.remove("hide");
+  await renderComments(id, box);
+}
+async function renderComments(id, box){
+  const {data}=await sb.from("comments")
+    .select("id,body,created_at,author_id,grz_only,morda_only,profiles!author_id(nick)")
+    .eq("thread_id",id).order("created_at",{ascending:true});
+  let cmap={};
+  try{
+    const cids=(data||[]).map(c=>c.id);
+    if(cids.length){
+      const {data:cr}=await sb.from("comment_reactions").select("comment_id,value,user_id").in("comment_id",cids);
+      (cr||[]).forEach(r=>{ const mm=cmap[r.comment_id]||(cmap[r.comment_id]={up:0,down:0,mine:0}); if(r.value===1)mm.up++; else mm.down++; if(r.user_id===user.id)mm.mine=r.value; });
+    }
+  }catch(e){}
+  let h="";
+  (data||[]).forEach(c=>{
+    const canDel=c.author_id===user.id||profile?.is_admin;
+    h+=`<div class="comment">
+      <div class="meta">${esc(c.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(c.created_at)}
+      ${c.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${c.morda_only?'<span class="badge m">MORDA</span>':''}
+      ${canDel?`<a href="#" data-delc="${c.id}" style="color:var(--danger)"> [usuń]</a>`:""}</div>
+      <div>${esc(c.body)}</div>
+      <div class="reactbar" id="creact-${c.id}">${reactBarHtml(c.id, cmap[c.id], 'c')}</div></div>`;
+  });
+  h+=`<div class="row" style="margin-top:8px">
+      <input id="ci-${id}" placeholder="Odpowiedz..." style="flex:1" maxlength="2000">
+      <button class="btn sm" data-addc="${id}">WYŚLIJ</button></div>
+      ${canGrz?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cg-${id}"> Tylko dla GRZBIETEK</label>`:""}
+      ${canMorda?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cm-${id}"> Tylko dla MORDA</label>`:""}`;
+  box.innerHTML=h;
+  bindReactBar(box);
+  box.querySelector("[data-addc]").onclick=async()=>{
+    const v=box.querySelector("#ci-"+id).value.trim(); if(!v) return;
+    const lim=commentLimit();
+    if(await dailyCount("comments") >= lim){ toast(`Dzienny limit komentarzy osiągnięty (${lim}). Spróbuj za jakiś czas.`); return; }
+    const grz_only = canGrz && box.querySelector("#cg-"+id)?.checked;
+    const morda_only = canMorda && box.querySelector("#cm-"+id)?.checked;
+    const {error}=await sb.from("comments").insert({thread_id:Number(id),author_id:user.id,body:v,grz_only,morda_only});
+    if(error){
+      if(/foreign key/i.test(error.message)){ toast("Ten wątek już nie istnieje — odświeżam listę."); loadThreads(); return; }
+      toast(friendlyErr(error)); return;
+    }
+    renderComments(id, box);
+  };
+  box.querySelectorAll("[data-delc]").forEach(a=>a.onclick=async(e)=>{
+    e.preventDefault();
+    await sb.from("comments").delete().eq("id",a.dataset.delc);
+    renderComments(id, box);
+  });
+}
+
+/* ===================== CZAT ===================== */
+function initChat(){
+  $("#chatbar").classList.remove("hide");
+  loadMessages();
+  if(chatSub) sb.removeChannel(chatSub);
+  chatSub=sb.channel("room")
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"},()=>loadMessages())
+    .subscribe();
+}
+$("#chatHead").addEventListener("click",()=>$("#chatbar").classList.toggle("open"));
+$("#chatSend").addEventListener("click", sendMsg);
+$("#chatInput").addEventListener("keydown",e=>{ if(e.key==="Enter") sendMsg(); });
+async function sendMsg(){
+  const v=$("#chatInput").value.trim(); if(!v) return;
+  $("#chatInput").value="";
+  const {error}=await sb.from("messages").insert({author_id:user.id,body:v});
+  if(error){ toast(friendlyErr(error)); }
+}
+async function loadMessages(){
+  const {data}=await sb.from("messages")
+    .select("id,body,created_at,author_id,profiles!author_id(nick)")
+    .order("created_at",{ascending:false}).limit(80);
+  const msgs=(data||[]).reverse();
+  const list=$("#chatlist");
+  list.innerHTML = msgs.map(m=>{
+    const me=m.author_id===user.id, canDel=me||profile?.is_admin;
+    return `<div class="msg ${me?'me':''}"><span class="who">${esc(m.profiles?.nick||"[usunięty]")}</span>
+      <time>${timeStr(m.created_at)}</time>
+      ${canDel?`<span class="x" data-delm="${m.id}">✕</span>`:""}
+      <div>${esc(m.body)}</div></div>`;
+  }).join("");
+  list.scrollTop=list.scrollHeight;
+  const last=msgs[msgs.length-1];
+  $("#chatLatest").textContent = last ? `${last.profiles?.nick||"?"}: ${last.body}` : "Cisza w eterze...";
+  list.querySelectorAll("[data-delm]").forEach(x=>x.onclick=async()=>{
+    await sb.from("messages").delete().eq("id",x.dataset.delm); loadMessages();
+  });
+}
+
+/* ===================== TRYB ADMINA ===================== */
+async function enterAdmin(){
+  if(adminMode){ // wyjscie
+    adminMode=false; renderUserbar(); toast("Tryb admina wyłączony."); return;
+  }
+  const pass=prompt("Potwierdź hasło, żeby wejść w tryb admina:");
+  if(pass===null) return;
+  const {error}=await sb.auth.signInWithPassword({email:user.email,password:pass});
+  if(error){ toast("Błędne hasło."); return; }
+  adminMode=true; renderUserbar(); openAdminPanel();
+}
+
+function openAdminPanel(){
+  const root=$("#modalRoot");
+  root.innerHTML=`<div class="overlay"><div class="modal">
+    <div class="row" style="justify-content:space-between">
+      <h2>PANEL ADMINA</h2><button class="btn sm ghost" id="amClose">ZAMKNIJ</button>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <span><b>Blokada zakładania wątków</b><br><span class="muted">Gdy włączona — tylko Ty dodajesz wątki.</span></span>
+        <button class="btn sm ${settings.threads_locked?'danger':'ghost'}" id="amLock">${settings.threads_locked?'WŁĄCZONA':'WYŁĄCZONA'}</button>
+      </div>
+    </div>
+    <h3 style="margin-top:14px">UŻYTKOWNICY</h3>
+    <div id="amUsers"><p class="muted">Wczytuję...</p></div>
+    <h3 style="margin-top:14px">WSZYSTKIE WĄTKI</h3>
+    <div id="amThreads"><p class="muted">Wczytuję...</p></div>
+  </div></div>`;
+  $("#amClose").onclick=()=>root.innerHTML="";
+  $("#amLock").onclick=async()=>{
+    const nv=!settings.threads_locked;
+    const {error}=await sb.from("settings").update({threads_locked:nv}).eq("id",1);
+    if(error){ toast("Błąd: "+error.message); return; }
+    settings.threads_locked=nv; applyLock(); openAdminPanel();
+  };
+  amLoadUsers(); amLoadThreads();
+}
+async function amLoadUsers(){
+  const {data}=await sb.rpc("admin_users");
+  const box=$("#amUsers"); if(!box) return;
+  box.innerHTML=(data||[]).map(p=>`
+    <div class="urow">
+      <span class="nm">${esc(p.nick)}
+        ${p.is_admin?'<span class="badge">admin</span>':''}
+        ${p.grzbietek?'<span class="badge g">grzbietek</span>':''}
+        ${p.morda?'<span class="badge m">morda</span>':''}
+        ${p.banned?'<span class="badge b">ban</span>':''}
+        ${p.shadowbanned?'<span class="badge b">shadow</span>':''}</span>
+      ${p.is_admin?'<span class="muted">to Ty</span>':`
+        <button class="btn sm ghost" data-grz="${p.id}" data-v="${p.grzbietek?0:1}">${p.grzbietek?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
+        <button class="btn sm ghost" data-morda="${p.id}" data-v="${p.morda?0:1}">${p.morda?'ZDEJMIJ MORDA':'NADAJ MORDA'}</button>
+        <button class="btn sm ghost" data-ban="${p.id}" data-v="${p.banned?0:1}">${p.banned?'ODBANUJ':'BAN'}</button>
+        <button class="btn sm ghost" data-sh="${p.id}" data-v="${p.shadowbanned?0:1}">${p.shadowbanned?'COFNIJ SHADOW':'SHADOWBAN'}</button>
+        <button class="btn sm danger" data-del="${p.id}">USUŃ KONTO</button>`}
+    </div>`).join("");
+  box.querySelectorAll("[data-grz]").forEach(b=>b.onclick=()=>amUpd(b.dataset.grz,{grzbietek:!!+b.dataset.v}));
+  box.querySelectorAll("[data-morda]").forEach(b=>b.onclick=()=>amUpd(b.dataset.morda,{morda:!!+b.dataset.v}));
+  box.querySelectorAll("[data-ban]").forEach(b=>b.onclick=()=>amUpd(b.dataset.ban,{banned:!!+b.dataset.v}));
+  box.querySelectorAll("[data-sh]").forEach(b=>b.onclick=()=>amUpd(b.dataset.sh,{shadowbanned:!!+b.dataset.v}));
+  box.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Usunąć konto? Wpisy zostaną, podpis zmieni się na [użytkownik usunięty].")) return;
+    await amUpd(b.dataset.del,{nick:"[użytkownik usunięty]",banned:true,deleted:true});
+  });
+}
+async function amUpd(id,patch){
+  const {error}=await sb.from("profiles").update(patch).eq("id",id);
+  if(error){ toast("Błąd: "+error.message); return; }
+  toast("Zapisano."); amLoadUsers();
+}
+async function amLoadThreads(){
+  const {data}=await sb.from("threads").select("id,title,grz_only,morda_only,profiles!author_id(nick)").order("created_at",{ascending:false});
+  const box=$("#amThreads"); if(!box) return;
+  box.innerHTML=(data||[]).map(t=>`<div class="urow" style="flex-direction:column;align-items:stretch">
+    <div class="row" style="justify-content:space-between">
+      <span class="nm">${esc(t.title)} ${t.grz_only?'<span class="badge g">grzbietek</span>':''}${t.morda_only?'<span class="badge m">morda</span>':''} <span class="muted">— ${esc(t.profiles?.nick||"?")}</span></span>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn sm ghost" data-tgrz="${t.id}" data-v="${t.grz_only?0:1}">${t.grz_only?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
+      <button class="btn sm ghost" data-tmorda="${t.id}" data-v="${t.morda_only?0:1}">${t.morda_only?'ZDEJMIJ MORDA':'NADAJ MORDA'}</button>
+      <button class="btn sm ghost" data-tc="${t.id}">KOMENTARZE</button>
+      <button class="btn sm danger" data-dt="${t.id}">USUŃ WĄTEK</button>
+    </div>
+    <div class="hide" id="amc-${t.id}" style="margin-top:6px"></div>
+  </div>`).join("") || `<p class="muted">Brak.</p>`;
+  box.querySelectorAll("[data-dt]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Usunąć wątek?")) return;
+    await sb.from("threads").delete().eq("id",b.dataset.dt); toast("Usunięto."); amLoadThreads(); loadThreads();
+  });
+  box.querySelectorAll("[data-tgrz]").forEach(b=>b.onclick=async()=>{
+    const {error}=await sb.from("threads").update({grz_only:!!+b.dataset.v}).eq("id",b.dataset.tgrz);
+    if(error){ toast("Błąd: "+error.message); return; }
+    toast("Zapisano."); amLoadThreads(); loadThreads();
+  });
+  box.querySelectorAll("[data-tmorda]").forEach(b=>b.onclick=async()=>{
+    const {error}=await sb.from("threads").update({morda_only:!!+b.dataset.v}).eq("id",b.dataset.tmorda);
+    if(error){ toast("Błąd: "+error.message); return; }
+    toast("Zapisano."); amLoadThreads(); loadThreads();
+  });
+  box.querySelectorAll("[data-tc]").forEach(b=>b.onclick=()=>amToggleComments(b.dataset.tc));
+}
+async function amToggleComments(tid){
+  const c=$("#amc-"+tid);
+  if(!c.classList.contains("hide")){ c.classList.add("hide"); return; }
+  c.classList.remove("hide");
+  const {data}=await sb.from("comments").select("id,body,grz_only,morda_only,profiles!author_id(nick)").eq("thread_id",tid).order("created_at",{ascending:true});
+  if(!data||!data.length){ c.innerHTML=`<p class="muted">Brak komentarzy.</p>`; return; }
+  c.innerHTML=data.map(cm=>`<div class="comment">
+    <div class="meta">${esc(cm.profiles?.nick||"[usunięty]")} ${cm.grz_only?'<span class="badge g">grzbietek</span>':''}${cm.morda_only?'<span class="badge m">morda</span>':''}</div>
+    <div>${esc(cm.body)}</div>
+    <div class="row" style="margin-top:5px">
+      <button class="btn sm ghost" data-cgrz="${cm.id}" data-v="${cm.grz_only?0:1}">${cm.grz_only?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
+      <button class="btn sm ghost" data-cmorda="${cm.id}" data-v="${cm.morda_only?0:1}">${cm.morda_only?'ZDEJMIJ MORDA':'NADAJ MORDA'}</button>
+      <button class="btn sm danger" data-dc="${cm.id}">USUŃ</button>
+    </div></div>`).join("");
+  c.querySelectorAll("[data-cgrz]").forEach(b=>b.onclick=async()=>{
+    const {error}=await sb.from("comments").update({grz_only:!!+b.dataset.v}).eq("id",b.dataset.cgrz);
+    if(error){ toast("Błąd: "+error.message); return; }
+    toast("Zapisano."); c.classList.add("hide"); amToggleComments(tid);
+  });
+  c.querySelectorAll("[data-cmorda]").forEach(b=>b.onclick=async()=>{
+    const {error}=await sb.from("comments").update({morda_only:!!+b.dataset.v}).eq("id",b.dataset.cmorda);
+    if(error){ toast("Błąd: "+error.message); return; }
+    toast("Zapisano."); c.classList.add("hide"); amToggleComments(tid);
+  });
+  c.querySelectorAll("[data-dc]").forEach(b=>b.onclick=async()=>{
+    await sb.from("comments").delete().eq("id",b.dataset.dc); toast("Usunięto."); c.classList.add("hide"); amToggleComments(tid);
+  });
+}
+
+/* ===================== SOUNDSYSTEM — PLANER ===================== */
+let placed=[], blockSeq=0, currentLayout=null;
+function counts(){ const c={}; placed.forEach(b=>c[b.type]=(c[b.type]||0)+1); return c; }
+function renderPalette(){
+  const c=counts();
+  $("#palette").innerHTML=Object.keys(CABS).map(t=>{
+    const used=c[t]||0, max=INVENTORY[t], cab=CABS[t];
+    return `<button class="pc" data-add="${t}" ${used>=max?'disabled':''}>
+      <b>${t}</b><small>${cab.w}×${cab.h}×${cab.d} cm</small><small>${used}/${max} użyte</small></button>`;
+  }).join("");
+  $("#palette").querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addBlock(b.dataset.add));
+}
+/* wymiary klocka w px / cm z uwzglednieniem obrotu */
+function dimsPx(b){ const c=CABS[b.type], r=b.rot===90; return { w:(r?c.h:c.w)*SCALE, h:(r?c.w:c.h)*SCALE }; }
+function dimsCm(b){ const c=CABS[b.type]; return b.rot===90 ? {w:c.h,h:c.w} : {w:c.w,h:c.h}; }
+/* czy dwa prostokaty na siebie nachodza (dotykanie krawedzia = OK) */
+function aabb(ax,ay,aw,ah,bx,by,bw,bh){ return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by; }
+function collides(b,x,y){
+  const d=dimsPx(b);
+  for(const o of placed){
+    if(o.id===b.id) continue;
+    const od=dimsPx(o);
+    if(aabb(x,y,d.w,d.h, o.x,o.y,od.w,od.h)) return true;
+  }
+  return false;
+}
+function clampPos(b,x,y){
+  const board=$("#board"), d=dimsPx(b);
+  return { x:Math.max(0,Math.min(x, board.scrollWidth - d.w)),
+           y:Math.max(0,Math.min(y, board.clientHeight - d.h)) };
+}
+/* znajdz wolne miejsce (od dolu, od lewej) */
+function findFreeSpot(b){
+  const board=$("#board"), d=dimsPx(b);
+  const maxX=Math.max(0, board.clientWidth - d.w), maxY=Math.max(0, board.clientHeight - d.h), step=12;
+  for(let y=maxY; y>=0; y-=step)
+    for(let x=0; x<=maxX; x+=step)
+      if(!collides(b,x,y)) return {x,y};
+  return {x:0,y:0};
+}
+function addBlock(type){
+  const c=counts(); if((c[type]||0)>=INVENTORY[type]) return;
+  const b={id:++blockSeq,type,x:0,y:0,rot:0};
+  placed.push(b);
+  const spot=findFreeSpot(b); b.x=spot.x; b.y=spot.y;
+  drawBoard(); renderPalette();
+}
+function rotateBlock(b){
+  const old=b.rot;
+  b.rot = b.rot===90?0:90;
+  const p=clampPos(b,b.x,b.y); b.x=p.x; b.y=p.y;
+  if(collides(b,b.x,b.y)){
+    const free=findFreeSpot(b);
+    if(collides(b,free.x,free.y)){ b.rot=old; toast("Brak miejsca na obrót."); return; }
+    b.x=free.x; b.y=free.y;
+  }
+  drawBoard();
+}
+function drawBoard(){
+  const board=$("#board");
+  board.querySelectorAll(".block").forEach(e=>e.remove());
+  placed.forEach(b=>{
+    const cab=CABS[b.type]; if(!cab) return;
+    const d=dimsPx(b), cm=dimsCm(b);
+    const el=document.createElement("div");
+    el.className="block"; el.style.cssText=`left:${b.x}px;top:${b.y}px;width:${d.w}px;height:${d.h}px;background:${cab.shade};color:${cab.fg}`;
+    el.innerHTML=`<span class="rot" data-rot="${b.id}">⟳</span><span class="rm" data-rm="${b.id}">×</span>
+      <span class="bt">${b.type}</span><span class="bd">${cm.w}×${cm.h}</span>`;
+    el.querySelector("[data-rm]").onclick=(e)=>{ e.stopPropagation(); placed=placed.filter(p=>p.id!==b.id); drawBoard(); renderPalette(); };
+    el.querySelector("[data-rot]").onclick=(e)=>{ e.stopPropagation(); rotateBlock(b); };
+    enableDrag(el,b);
+    board.appendChild(el);
+  });
+}
+function enableDrag(el,b){
+  let sx,sy,ox,oy,drag=false;
+  el.addEventListener("pointerdown",e=>{
+    if(e.target.dataset.rm!==undefined || e.target.dataset.rot!==undefined) return;
+    drag=true; el.setPointerCapture(e.pointerId);
+    sx=e.clientX; sy=e.clientY; ox=b.x; oy=b.y;
+  });
+  el.addEventListener("pointermove",e=>{
+    if(!drag) return;
+    const t=clampPos(b, ox+(e.clientX-sx), oy+(e.clientY-sy));
+    // ruch po kazdej osi osobno -> klocek slizga sie wzdluz sasiada zamiast blokowac
+    if(!collides(b, t.x, b.y)) b.x=t.x;
+    if(!collides(b, b.x, t.y)) b.y=t.y;
+    el.style.left=b.x+"px"; el.style.top=b.y+"px";
+  });
+  el.addEventListener("pointerup",()=>drag=false);
+  el.addEventListener("pointercancel",()=>drag=false);
+}
+$("#ssClear").onclick=()=>{ if(placed.length&&!confirm("Wyczyścić układ?"))return; placed=[]; currentLayout=null; $("#ssCurrent").textContent=""; drawBoard(); renderPalette(); };
+$("#ssSave").onclick=async()=>{
+  if(!placed.length){ toast("Najpierw coś ułóż."); return; }
+  if(currentLayout){
+    const {error}=await sb.from("layouts").update({data:{placed}, updated_at:new Date().toISOString()}).eq("id",currentLayout.id);
+    if(error){ toast("Błąd: "+error.message); return; }
+    toast("Zapisano zmiany w „"+currentLayout.name+"”.");
+  } else saveNew();
+};
+$("#ssSaveNew").onclick=saveNew;
+async function saveNew(){
+  if(!placed.length){ toast("Najpierw coś ułóż."); return; }
+  const name=prompt("Nazwa układu:"); if(!name) return;
+  const {data,error}=await sb.from("layouts").insert({author_id:user.id,name:name.trim(),data:{placed}}).select().single();
+  if(error){ toast("Błąd: "+error.message); return; }
+  currentLayout=data; $("#ssCurrent").textContent="Edytujesz: "+data.name; toast("Zapisano.");
+}
+$("#ssLoad").onclick=async()=>{
+  const {data}=await sb.from("layouts").select("id,name,author_id,updated_at,profiles!author_id(nick)").order("updated_at",{ascending:false});
+  const root=$("#modalRoot");
+  root.innerHTML=`<div class="overlay"><div class="modal">
+    <div class="row" style="justify-content:space-between"><h2>ZAPISANE UKŁADY</h2><button class="btn sm ghost" id="loClose">ZAMKNIJ</button></div>
+    ${(data&&data.length)?data.map(l=>`<div class="urow"><span class="nm">${esc(l.name)} <span class="muted">— ${esc(l.profiles?.nick||"?")}</span></span>
+      <button class="btn sm" data-open="${l.id}">OTWÓRZ</button>
+      ${(l.author_id===user.id||profile?.is_admin)?`<button class="btn sm danger" data-del="${l.id}">USUŃ</button>`:""}</div>`).join("")
+      :'<p class="muted">Brak zapisanych układów.</p>'}
+  </div></div>`;
+  $("#loClose").onclick=()=>root.innerHTML="";
+  root.querySelectorAll("[data-open]").forEach(b=>b.onclick=async()=>{
+    const {data:l}=await sb.from("layouts").select("*").eq("id",b.dataset.open).single();
+    placed=(l.data.placed||[]).filter(p=>CABS[p.type]).map(p=>({...p,id:++blockSeq}));
+    currentLayout=l; $("#ssCurrent").textContent="Edytujesz: "+l.name;
+    root.innerHTML=""; drawBoard(); renderPalette(); toast("Wczytano „"+l.name+"”.");
+  });
+  root.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    await sb.from("layouts").delete().eq("id",b.dataset.del); $("#ssLoad").click();
+  });
+};
+
+/* ===================== START ===================== */
+if(configured){
+  sb.auth.getSession().then(({data})=>{
+    booted=true;
+    if(data.session) onSignedIn(data.session); else onSignedOut();
+  });
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(!booted) return;
+    if(event==="SIGNED_IN"){
+      if(user && session?.user?.id===user.id) return; // re-auth admina — nie resetuj
+      onSignedIn(session);
+    } else if(event==="SIGNED_OUT"){ onSignedOut(); }
+  });
+} else { show("auth"); }
+</script>
+</body>
+</html>
