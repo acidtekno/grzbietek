@@ -77,6 +77,13 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 @keyframes bulbpulse{0%,100%{opacity:.4}50%{opacity:1}}
 .timg{display:block; max-width:240px; max-height:200px; width:auto; height:auto; border:2px solid var(--ink); margin:10px 0 4px; cursor:zoom-in}
 .cimg{display:block; max-width:160px; max-height:130px; width:auto; height:auto; border:2px solid var(--ink); margin:6px 0 2px; cursor:zoom-in}
+.imgs{display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 4px}
+.imgs .timg{margin:0}
+.cimgs{display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px}
+.cimgs .cimg{margin:0}
+.edt{color:var(--ink-dim); font-size:11px; text-transform:uppercase; letter-spacing:.5px}
+.ed-title{width:100%; margin-bottom:8px}
+.ed-body{width:100%; min-height:90px}
 .embed{margin:10px 0; max-width:480px}
 .ytf{position:relative; aspect-ratio:16/9; border:2px solid var(--ink); cursor:pointer; background:#000; overflow:hidden}
 .ytf .thumb{position:absolute; inset:0; background-size:cover; background-position:center; opacity:.85}
@@ -227,7 +234,7 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
         <div class="spacer"></div>
         <textarea id="ntBody" placeholder="Co masz do powiedzenia?" maxlength="5000"></textarea>
         <div class="spacer"></div>
-        <label class="filepick">Zdjęcie (opcjonalnie): <input type="file" id="ntImage" accept="image/*"></label>
+        <label class="filepick">Zdjęcia (mini, opcjonalnie, do 4): <input type="file" id="ntImage" accept="image/*" multiple></label>
         <div class="spacer"></div>
         <label id="ntGrzWrap" class="grzcheck hide"><input type="checkbox" id="ntGrz"> Widoczny tylko dla GRZBIETEK</label>
         <label id="ntMordaWrap" class="grzcheck hide"><input type="checkbox" id="ntMorda"> Widoczny tylko dla MORDA</label>
@@ -328,11 +335,12 @@ async function rmImages(urls){
 async function purgeThreadImages(id){
   try{
     const [{data:t},{data:cs}] = await Promise.all([
-      sb.from("threads").select("image_url").eq("id",id).maybeSingle(),
-      sb.from("comments").select("image_url").eq("thread_id",id)
+      sb.from("threads").select("image_url,image_urls").eq("id",id).maybeSingle(),
+      sb.from("comments").select("image_url,image_urls").eq("thread_id",id)
     ]);
-    const urls=[]; if(t&&t.image_url) urls.push(t.image_url);
-    (cs||[]).forEach(c=>{ if(c.image_url) urls.push(c.image_url); });
+    const urls=[];
+    const add=o=>{ if(o&&o.image_url) urls.push(o.image_url); if(o&&Array.isArray(o.image_urls)) o.image_urls.forEach(u=>urls.push(u)); };
+    add(t); (cs||[]).forEach(add);
     await rmImages(urls);
   }catch(e){ console.error(e); }
 }
@@ -358,6 +366,22 @@ async function shrinkImage(file, maxBytes){
   if(!blob) return file;
   const base=(file.name||"foto").replace(/\.[^.]+$/,"")||"foto";
   return new File([blob], base+".jpg", {type:"image/jpeg"});
+}
+// Wgrywa liste plikow (zmniejszajac kazdy), zwraca tablice publicznych URL-i.
+async function uploadImages(files, prefix, max){
+  const out=[]; const list=Array.from(files||[]).slice(0, max||4);
+  for(const file of list){
+    if(!file.type.startsWith("image/")){ toast("Pomijam plik, który nie jest zdjęciem."); continue; }
+    let up=file;
+    try{ up=await shrinkImage(file, 2*1024*1024); }catch(e){ console.error(e); }
+    if(up.size>2*1024*1024){ toast("Pominięto za duże zdjęcie."); continue; }
+    const ext=(up.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+    const path=`${prefix}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`;
+    const {error:upErr}=await sb.storage.from("thread-images").upload(path,up,{cacheControl:"3600",upsert:false,contentType:up.type});
+    if(upErr){ console.error(upErr); toast("Nie udało się wgrać jednego zdjęcia."); continue; }
+    out.push(sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl);
+  }
+  return out;
 }
 // Zamienia adresy URL w tekscie na klikalne linki (bezpiecznie, z escapowaniem).
 function linkify(raw){
@@ -464,7 +488,7 @@ async function doAuth(){
       const {error}=await sb.auth.signInWithPassword({email,password:pass});
       if(error) throw error;
     }
-  }catch(e){ toast("Błąd: "+(e.message||e)); }
+  }catch(e){ const m=(e&&e.message)||""; toast(/invalid login|credentials/i.test(m)?"Błędny e-mail lub hasło.":/already registered|exists|user already/i.test(m)?"Konto z tym e-mailem już istnieje.":/email/i.test(m)&&/confirm/i.test(m)?"Potwierdź e-mail klikając link w wiadomości.":friendlyErr(e)); }
   $("#doAuth").disabled=false;
 }
 
@@ -553,25 +577,16 @@ $("#addThread").addEventListener("click", async ()=>{
   const eligible = !!(profile && (profile.grzbietek || profile.is_admin));
   const grz_only = eligible && $("#ntGrz").checked;
   const morda_only = canMorda && $("#ntMorda").checked;
-  // zdjęcie (opcjonalne)
-  let image_url=null;
-  const file=$("#ntImage").files[0];
-  if(file){
-    if(!file.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
-    $("#addThread").disabled=true; toast("Przetwarzam zdjęcie...");
-    let up=file;
-    try{ up=await shrinkImage(file, 2*1024*1024); }catch(e){ console.error(e); }
-    if(up.size>2*1024*1024){ $("#addThread").disabled=false; toast("Nie udało się zmniejszyć zdjęcia poniżej 2 MB."); return; }
-    toast("Wgrywam zdjęcie...");
-    const ext=(up.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
-    const path=`${user.id}/${Date.now()}.${ext}`;
-    const {error:upErr}=await sb.storage.from("thread-images").upload(path,up,{cacheControl:"3600",upsert:false,contentType:up.type});
+  // zdjęcia (opcjonalne, do 4)
+  let image_urls=[];
+  const files=$("#ntImage").files;
+  if(files && files.length){
+    $("#addThread").disabled=true; toast("Przetwarzam zdjęcia...");
+    image_urls=await uploadImages(files, "threads", 4);
     $("#addThread").disabled=false;
-    if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
-    image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
   }
   const tpayload={author_id:user.id,title,body,grz_only,morda_only};
-  if(image_url) tpayload.image_url=image_url;
+  if(image_urls.length) tpayload.image_urls=image_urls;
   const {data,error}=await sb.from("threads").insert(tpayload).select("grz_only,morda_only").single();
   if(error){ toast(friendlyErr(error)); return; }
   $("#ntTitle").value=""; $("#ntBody").value=""; $("#ntGrz").checked=false; $("#ntMorda").checked=false; $("#ntImage").value="";
@@ -621,10 +636,10 @@ async function doReact(kind, id, value){
 }
 async function loadThreads(){
   let {data,error}=await sb.from("threads")
-    .select("id,title,body,created_at,author_id,grz_only,morda_only,image_url,profiles!author_id(nick)")
+    .select("id,title,body,created_at,author_id,grz_only,morda_only,image_url,image_urls,profiles!author_id(nick)")
     .order("created_at",{ascending:false});
   if(error){
-    // np. kolumna image_url jeszcze nie istnieje — wczytaj bez niej
+    // np. kolumna image_url/image_urls jeszcze nie istnieje — wczytaj bez nich
     ({data,error}=await sb.from("threads")
       .select("id,title,body,created_at,author_id,grz_only,morda_only,profiles!author_id(nick)")
       .order("created_at",{ascending:false}));
@@ -659,17 +674,20 @@ async function loadThreads(){
   list.innerHTML="";
   for(const t of data){
     const mine=t.author_id===user.id, canDel=mine||profile?.is_admin;
-    const el=document.createElement("div"); el.className="thread";
+    const el=document.createElement("div"); el.className="thread"; el.id="thread-"+t.id;
     const long = (t.body||"").length > 80;
     const bodyHtml = long
-      ? `<span class="short">${esc(t.body.slice(0,80))}… </span><span class="full hide">${esc(t.body)} </span><a href="#" class="more" data-more="${t.id}">rozwiń</a>`
-      : esc(t.body);
+      ? `<span class="short">${esc(t.body.slice(0,80))}… </span><span class="full hide">${linkify(t.body)} </span><a href="#" class="more" data-more="${t.id}">rozwiń</a>`
+      : linkify(t.body);
+    const imgs = (Array.isArray(t.image_urls)&&t.image_urls.length) ? t.image_urls : (t.image_url?[t.image_url]:[]);
+    const imgsHtml = imgs.length ? `<div class="imgs">${imgs.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img class="timg" src="${esc(u)}" alt="" loading="lazy"></a>`).join("")}</div>` : "";
     el.innerHTML=`
       ${canDel?`<button class="btn sm danger delx" data-del="${t.id}">USUŃ</button>`:""}
       <h3 data-open="${t.id}">${esc(t.title)} ${t.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${t.morda_only?'<span class="badge m">MORDA</span>':''}${activeSet.has(t.id)?BULB:''}</h3>
-      <div class="meta">${esc(t.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(t.created_at)}</div>
+      <div class="meta">${esc(t.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(t.created_at)}${mine?` · <a href="#" class="edt" data-edit="${t.id}">edytuj</a>`:""}</div>
       <div class="body">${bodyHtml}</div>
-      ${t.image_url?`<a href="${esc(t.image_url)}" target="_blank" rel="noopener"><img class="timg" src="${esc(t.image_url)}" alt="" loading="lazy"></a>`:""}
+      ${mediaEmbeds(t.body)}
+      ${imgsHtml}
       <div class="threadbar">
         <div class="tbleft">
           ${adminMode?`<span class="reorder"><button class="robtn" data-mv="up" data-id="${t.id}" title="W górę">▲</button><button class="robtn" data-mv="down" data-id="${t.id}" title="W dół">▼</button></span>`:""}
@@ -681,6 +699,7 @@ async function loadThreads(){
     list.appendChild(el);
   }
   list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>delThread(b.dataset.del));
+  list.querySelectorAll("[data-edit]").forEach(b=>b.onclick=(e)=>{ e.preventDefault(); editThread(b.dataset.edit); });
   list.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>toggleComments(b.dataset.open));
   list.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveThread(Number(b.dataset.id), b.dataset.mv==="up"?-1:1));
   bindReactBar(list);
@@ -711,6 +730,27 @@ async function delThread(id){
   if(error){ toast(friendlyErr(error)); return; }
   toast("Wątek usunięty."); loadThreads();
 }
+async function editThread(id){
+  const {data:t}=await sb.from("threads").select("title,body").eq("id",id).maybeSingle();
+  if(!t) return;
+  const card=document.getElementById("thread-"+id); if(!card) return;
+  card.innerHTML=`<input class="ed-title" maxlength="23" value="${esc(t.title)}" placeholder="Tytuł (max 23)">
+    <textarea class="ed-body" maxlength="5000" placeholder="Treść">${esc(t.body)}</textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn sm" data-savet>ZAPISZ</button>
+      <button class="btn sm ghost" data-cancelt>ANULUJ</button>
+    </div>`;
+  card.querySelector("[data-savet]").onclick=async()=>{
+    const title=card.querySelector(".ed-title").value.trim();
+    const body=card.querySelector(".ed-body").value.trim();
+    if(!title||!body){ toast("Tytuł i treść nie mogą być puste."); return; }
+    if(title.length>23){ toast("Tytuł może mieć max 23 znaki."); return; }
+    const {error}=await sb.from("threads").update({title,body}).eq("id",id);
+    if(error){ toast(friendlyErr(error)); return; }
+    toast("Zapisano."); loadThreads();
+  };
+  card.querySelector("[data-cancelt]").onclick=()=>loadThreads();
+}
 async function toggleComments(id){
   const box=$("#c-"+id);
   if(!box.classList.contains("hide")){ box.classList.add("hide"); return; }
@@ -719,7 +759,7 @@ async function toggleComments(id){
 }
 async function renderComments(id, box){
   let {data,error}=await sb.from("comments")
-    .select("id,body,created_at,author_id,grz_only,morda_only,image_url,profiles!author_id(nick)")
+    .select("id,body,created_at,author_id,grz_only,morda_only,image_url,image_urls,profiles!author_id(nick)")
     .eq("thread_id",id).order("created_at",{ascending:true});
   if(error){
     ({data}=await sb.from("comments")
@@ -736,20 +776,22 @@ async function renderComments(id, box){
   }catch(e){}
   let h="";
   (data||[]).forEach(c=>{
-    const canDel=c.author_id===user.id||profile?.is_admin;
-    h+=`<div class="comment">
+    const mine=c.author_id===user.id, canDel=mine||profile?.is_admin;
+    const cimgs=(Array.isArray(c.image_urls)&&c.image_urls.length)?c.image_urls:(c.image_url?[c.image_url]:[]);
+    const cimgsHtml=cimgs.length?`<div class="cimgs">${cimgs.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img class="cimg" src="${esc(u)}" alt="" loading="lazy"></a>`).join("")}</div>`:"";
+    h+=`<div class="comment" id="comment-${c.id}">
       <div class="meta">${esc(c.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(c.created_at)}
       ${c.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${c.morda_only?'<span class="badge m">MORDA</span>':''}
-      ${canDel?`<a href="#" data-delc="${c.id}" style="color:var(--danger)"> [usuń]</a>`:""}</div>
-      <div>${linkify(c.body)}</div>
+      ${mine?`<a href="#" class="edt" data-editc="${c.id}"> [edytuj]</a>`:""}${canDel?`<a href="#" data-delc="${c.id}" style="color:var(--danger)"> [usuń]</a>`:""}</div>
+      <div class="cbody">${linkify(c.body)}</div>
       ${mediaEmbeds(c.body)}
-      ${c.image_url?`<a href="${esc(c.image_url)}" target="_blank" rel="noopener"><img class="cimg" src="${esc(c.image_url)}" alt="" loading="lazy"></a>`:""}
+      ${cimgsHtml}
       <div class="reactbar" id="creact-${c.id}">${reactBarHtml(c.id, cmap[c.id], 'c')}</div></div>`;
   });
   h+=`<div class="row" style="margin-top:8px">
       <input id="ci-${id}" placeholder="Odpowiedz..." style="flex:1" maxlength="2000">
       <button class="btn sm" data-addc="${id}">WYŚLIJ</button></div>
-      <label class="filepick" style="margin-top:6px">Zdjęcie (mini, opcjonalnie): <input type="file" id="cimg-${id}" accept="image/*"></label>
+      <label class="filepick" style="margin-top:6px">Zdjęcia (mini, opcjonalnie, do 4): <input type="file" id="cimg-${id}" accept="image/*" multiple></label>
       ${canGrz?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cg-${id}"> Tylko dla GRZBIETEK</label>`:""}
       ${canMorda?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cm-${id}"> Tylko dla MORDA</label>`:""}`;
   box.innerHTML=h;
@@ -761,25 +803,16 @@ async function renderComments(id, box){
     if(await dailyCount("comments") >= lim){ toast(`Dzienny limit komentarzy osiągnięty (${lim}). Spróbuj za jakiś czas.`); return; }
     const grz_only = canGrz && box.querySelector("#cg-"+id)?.checked;
     const morda_only = canMorda && box.querySelector("#cm-"+id)?.checked;
-    // zdjęcie w komentarzu (mini, opcjonalne)
-    let image_url=null;
-    const cfile=box.querySelector("#cimg-"+id)?.files[0];
-    if(cfile){
-      if(!cfile.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
-      const btn=box.querySelector("[data-addc]"); if(btn) btn.disabled=true; toast("Przetwarzam zdjęcie...");
-      let cup=cfile;
-      try{ cup=await shrinkImage(cfile, 2*1024*1024); }catch(e){ console.error(e); }
-      if(cup.size>2*1024*1024){ if(btn) btn.disabled=false; toast("Nie udało się zmniejszyć zdjęcia poniżej 2 MB."); return; }
-      toast("Wgrywam zdjęcie...");
-      const ext=(cup.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
-      const path=`comments/${user.id}/${Date.now()}.${ext}`;
-      const {error:upErr}=await sb.storage.from("thread-images").upload(path,cup,{cacheControl:"3600",upsert:false,contentType:cup.type});
+    // zdjęcia w komentarzu (mini, do 4)
+    let image_urls=[];
+    const cfiles=box.querySelector("#cimg-"+id)?.files;
+    if(cfiles && cfiles.length){
+      const btn=box.querySelector("[data-addc]"); if(btn) btn.disabled=true; toast("Przetwarzam zdjęcia...");
+      image_urls=await uploadImages(cfiles, "comments", 4);
       if(btn) btn.disabled=false;
-      if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
-      image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
     }
     const cpayload={thread_id:Number(id),author_id:user.id,body:v,grz_only,morda_only};
-    if(image_url) cpayload.image_url=image_url;
+    if(image_urls.length) cpayload.image_urls=image_urls;
     const {error}=await sb.from("comments").insert(cpayload);
     if(error){
       if(/foreign key/i.test(error.message)){ toast("Ten wątek już nie istnieje — odświeżam listę."); loadThreads(); return; }
@@ -790,9 +823,26 @@ async function renderComments(id, box){
   box.querySelectorAll("[data-delc]").forEach(a=>a.onclick=async(e)=>{
     e.preventDefault();
     const cid=a.dataset.delc;
-    try{ const {data:cm}=await sb.from("comments").select("image_url").eq("id",cid).maybeSingle(); if(cm&&cm.image_url) await rmImages([cm.image_url]); }catch(_){}
+    try{ const {data:cm}=await sb.from("comments").select("image_url,image_urls").eq("id",cid).maybeSingle(); const u=[]; if(cm&&cm.image_url)u.push(cm.image_url); if(cm&&Array.isArray(cm.image_urls))cm.image_urls.forEach(x=>u.push(x)); if(u.length) await rmImages(u); }catch(_){}
     await sb.from("comments").delete().eq("id",cid);
     renderComments(id, box);
+  });
+  box.querySelectorAll("[data-editc]").forEach(a=>a.onclick=async(e)=>{
+    e.preventDefault();
+    const cid=a.dataset.editc;
+    const {data:cm}=await sb.from("comments").select("body").eq("id",cid).maybeSingle();
+    if(!cm) return;
+    const node=box.querySelector("#comment-"+cid+" .cbody"); if(!node) return;
+    node.innerHTML=`<textarea class="ed-body" maxlength="2000">${esc(cm.body)}</textarea>
+      <div class="row" style="margin-top:6px"><button class="btn sm" data-savec>ZAPISZ</button><button class="btn sm ghost" data-cancelc>ANULUJ</button></div>`;
+    node.querySelector("[data-savec]").onclick=async()=>{
+      const nb=node.querySelector(".ed-body").value.trim();
+      if(!nb){ toast("Treść nie może być pusta."); return; }
+      const {error}=await sb.from("comments").update({body:nb}).eq("id",cid);
+      if(error){ toast(friendlyErr(error)); return; }
+      toast("Zapisano."); renderComments(id, box);
+    };
+    node.querySelector("[data-cancelc]").onclick=()=>renderComments(id, box);
   });
 }
 
@@ -868,7 +918,7 @@ function openAdminPanel(){
   $("#amLock").onclick=async()=>{
     const nv=!settings.threads_locked;
     const {error}=await sb.from("settings").update({threads_locked:nv}).eq("id",1);
-    if(error){ toast("Błąd: "+error.message); return; }
+    if(error){ toast(friendlyErr(error)); return; }
     settings.threads_locked=nv; applyLock(); openAdminPanel();
   };
   amLoadUsers(); amLoadThreads();
@@ -902,7 +952,7 @@ async function amLoadUsers(){
 }
 async function amUpd(id,patch){
   const {error}=await sb.from("profiles").update(patch).eq("id",id);
-  if(error){ toast("Błąd: "+error.message); return; }
+  if(error){ toast(friendlyErr(error)); return; }
   toast("Zapisano."); amLoadUsers();
 }
 async function amLoadThreads(){
@@ -938,12 +988,12 @@ async function amLoadThreads(){
   });
   box.querySelectorAll("[data-tgrz]").forEach(b=>b.onclick=async()=>{
     const {error}=await sb.from("threads").update({grz_only:!!+b.dataset.v}).eq("id",b.dataset.tgrz);
-    if(error){ toast("Błąd: "+error.message); return; }
+    if(error){ toast(friendlyErr(error)); return; }
     toast("Zapisano."); amLoadThreads(); loadThreads();
   });
   box.querySelectorAll("[data-tmorda]").forEach(b=>b.onclick=async()=>{
     const {error}=await sb.from("threads").update({morda_only:!!+b.dataset.v}).eq("id",b.dataset.tmorda);
-    if(error){ toast("Błąd: "+error.message); return; }
+    if(error){ toast(friendlyErr(error)); return; }
     toast("Zapisano."); amLoadThreads(); loadThreads();
   });
   box.querySelectorAll("[data-tc]").forEach(b=>b.onclick=()=>amToggleComments(b.dataset.tc));
@@ -964,16 +1014,16 @@ async function amToggleComments(tid){
     </div></div>`).join("");
   c.querySelectorAll("[data-cgrz]").forEach(b=>b.onclick=async()=>{
     const {error}=await sb.from("comments").update({grz_only:!!+b.dataset.v}).eq("id",b.dataset.cgrz);
-    if(error){ toast("Błąd: "+error.message); return; }
+    if(error){ toast(friendlyErr(error)); return; }
     toast("Zapisano."); c.classList.add("hide"); amToggleComments(tid);
   });
   c.querySelectorAll("[data-cmorda]").forEach(b=>b.onclick=async()=>{
     const {error}=await sb.from("comments").update({morda_only:!!+b.dataset.v}).eq("id",b.dataset.cmorda);
-    if(error){ toast("Błąd: "+error.message); return; }
+    if(error){ toast(friendlyErr(error)); return; }
     toast("Zapisano."); c.classList.add("hide"); amToggleComments(tid);
   });
   c.querySelectorAll("[data-dc]").forEach(b=>b.onclick=async()=>{
-    try{ const {data:cm}=await sb.from("comments").select("image_url").eq("id",b.dataset.dc).maybeSingle(); if(cm&&cm.image_url) await rmImages([cm.image_url]); }catch(_){}
+    try{ const {data:cm}=await sb.from("comments").select("image_url,image_urls").eq("id",b.dataset.dc).maybeSingle(); const u=[]; if(cm&&cm.image_url)u.push(cm.image_url); if(cm&&Array.isArray(cm.image_urls))cm.image_urls.forEach(x=>u.push(x)); if(u.length) await rmImages(u); }catch(_){}
     await sb.from("comments").delete().eq("id",b.dataset.dc); toast("Usunięto."); c.classList.add("hide"); amToggleComments(tid);
   });
 }
@@ -1075,7 +1125,7 @@ $("#ssSave").onclick=async()=>{
   if(!placed.length){ toast("Najpierw coś ułóż."); return; }
   if(currentLayout){
     const {error}=await sb.from("layouts").update({data:{placed}, updated_at:new Date().toISOString()}).eq("id",currentLayout.id);
-    if(error){ toast("Błąd: "+error.message); return; }
+    if(error){ toast(friendlyErr(error)); return; }
     toast("Zapisano zmiany w „"+currentLayout.name+"”.");
   } else saveNew();
 };
@@ -1084,7 +1134,7 @@ async function saveNew(){
   if(!placed.length){ toast("Najpierw coś ułóż."); return; }
   const name=prompt("Nazwa układu:"); if(!name) return;
   const {data,error}=await sb.from("layouts").insert({author_id:user.id,name:name.trim(),data:{placed}}).select().single();
-  if(error){ toast("Błąd: "+error.message); return; }
+  if(error){ toast(friendlyErr(error)); return; }
   currentLayout=data; $("#ssCurrent").textContent="Edytujesz: "+data.name; toast("Zapisano.");
 }
 $("#ssLoad").onclick=async()=>{
