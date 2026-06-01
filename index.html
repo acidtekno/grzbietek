@@ -300,6 +300,29 @@ function friendlyErr(e){
   if(/check constraint|_len/i.test(m)) return "Treść jest za długa.";
   return "Coś poszło nie tak. Spróbuj ponownie.";
 }
+// Zmniejsza zdjęcie (rozdzielczość + jakość JPEG), aż zejdzie poniżej maxBytes.
+// Jeśli plik już jest mniejszy, zwraca oryginał bez zmian.
+async function shrinkImage(file, maxBytes){
+  if(file.size <= maxBytes) return file;
+  const dataUrl = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+  const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("decode")); i.src=dataUrl; });
+  let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+  const MAXDIM=1600;
+  if(Math.max(w,h)>MAXDIM){ const k=MAXDIM/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+  let quality=0.9, blob=null;
+  for(let i=0;i<9;i++){
+    const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+    const ctx=cv.getContext("2d");
+    ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,w,h); // tło pod ewentualną przezroczystość
+    ctx.drawImage(img,0,0,w,h);
+    blob=await new Promise(res=>cv.toBlob(res,"image/jpeg",quality));
+    if(blob && blob.size<=maxBytes) break;
+    if(quality>0.55){ quality-=0.12; } else { w=Math.round(w*0.85); h=Math.round(h*0.85); quality=0.8; }
+  }
+  if(!blob) return file;
+  const base=(file.name||"foto").replace(/\.[^.]+$/,"")||"foto";
+  return new File([blob], base+".jpg", {type:"image/jpeg"});
+}
 
 if(!SUPABASE_URL.startsWith("http") || SUPABASE_ANON_KEY.length<20){
   const b=$("#cfgbanner"); b.classList.remove("hide");
@@ -446,11 +469,14 @@ $("#addThread").addEventListener("click", async ()=>{
   const file=$("#ntImage").files[0];
   if(file){
     if(!file.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
-    if(file.size>2*1024*1024){ toast("Zdjęcie za duże (max 2 MB). Wybierz mniejsze."); return; }
-    $("#addThread").disabled=true; toast("Wgrywam zdjęcie...");
-    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+    $("#addThread").disabled=true; toast("Przetwarzam zdjęcie...");
+    let up=file;
+    try{ up=await shrinkImage(file, 2*1024*1024); }catch(e){ console.error(e); }
+    if(up.size>2*1024*1024){ $("#addThread").disabled=false; toast("Nie udało się zmniejszyć zdjęcia poniżej 2 MB."); return; }
+    toast("Wgrywam zdjęcie...");
+    const ext=(up.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
     const path=`${user.id}/${Date.now()}.${ext}`;
-    const {error:upErr}=await sb.storage.from("thread-images").upload(path,file,{cacheControl:"3600",upsert:false});
+    const {error:upErr}=await sb.storage.from("thread-images").upload(path,up,{cacheControl:"3600",upsert:false,contentType:up.type});
     $("#addThread").disabled=false;
     if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
     image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
@@ -624,11 +650,14 @@ async function renderComments(id, box){
     const cfile=box.querySelector("#cimg-"+id)?.files[0];
     if(cfile){
       if(!cfile.type.startsWith("image/")){ toast("To nie jest zdjęcie."); return; }
-      if(cfile.size>2*1024*1024){ toast("Zdjęcie za duże (max 2 MB). Wybierz mniejsze."); return; }
-      const btn=box.querySelector("[data-addc]"); if(btn) btn.disabled=true; toast("Wgrywam zdjęcie...");
-      const ext=(cfile.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
+      const btn=box.querySelector("[data-addc]"); if(btn) btn.disabled=true; toast("Przetwarzam zdjęcie...");
+      let cup=cfile;
+      try{ cup=await shrinkImage(cfile, 2*1024*1024); }catch(e){ console.error(e); }
+      if(cup.size>2*1024*1024){ if(btn) btn.disabled=false; toast("Nie udało się zmniejszyć zdjęcia poniżej 2 MB."); return; }
+      toast("Wgrywam zdjęcie...");
+      const ext=(cup.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"");
       const path=`comments/${user.id}/${Date.now()}.${ext}`;
-      const {error:upErr}=await sb.storage.from("thread-images").upload(path,cfile,{cacheControl:"3600",upsert:false});
+      const {error:upErr}=await sb.storage.from("thread-images").upload(path,cup,{cacheControl:"3600",upsert:false,contentType:cup.type});
       if(btn) btn.disabled=false;
       if(upErr){ toast("Nie udało się wgrać zdjęcia."); console.error(upErr); return; }
       image_url=sb.storage.from("thread-images").getPublicUrl(path).data.publicUrl;
