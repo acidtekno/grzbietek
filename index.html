@@ -353,6 +353,13 @@ function ytId(url){
   const m=url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m?m[1]:null;
 }
+// Zwraca kanoniczny link do utworu/zestawu SoundCloud nadajacy sie do osadzenia, albo null.
+function scUrl(url){
+  if(/(^|\/\/)(on|w)\.soundcloud\.com/i.test(url)) return null;       // skrocone / widget — nie da sie osadzic
+  const u=url.replace(/^https?:\/\/(m|mobi|www)\.soundcloud\.com/i,"https://soundcloud.com");
+  if(!/^https?:\/\/soundcloud\.com\/[^\/]+\/[^\/?#]+/i.test(u)) return null; // wymagaj wykonawca/utwor
+  return u;
+}
 // Zwraca HTML z "miniaturami" YouTube/SoundCloud; player wstawia sie po kliknieciu (bindEmbeds).
 function mediaEmbeds(raw){
   const text=raw||""; const re=/(https?:\/\/[^\s<]+)/g;
@@ -363,8 +370,9 @@ function mediaEmbeds(raw){
     const yt=ytId(url);
     if(yt){
       html+=`<div class="embed ytf" data-yt="${esc(yt)}"><div class="thumb" style="background-image:url('https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg')"></div><button class="playbtn" type="button">► ODTWÓRZ</button></div>`;
-    }else if(/soundcloud\.com\//.test(url) && !/w\.soundcloud\.com/.test(url)){
-      html+=`<div class="embed scf" data-sc="${encodeURIComponent(url)}"><button class="playbtn" type="button">► SOUNDCLOUD — ODTWÓRZ</button></div>`;
+    }else{
+      const su=scUrl(url);
+      if(su) html+=`<div class="embed scf" data-sc="${encodeURIComponent(su)}"><button class="playbtn" type="button">► SOUNDCLOUD — ODTWÓRZ</button></div>`;
     }
   }
   return html;
