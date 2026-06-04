@@ -108,6 +108,9 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 .rbtn svg{width:14px; height:14px; display:block}
 .filepick{display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.5px}
 .filepick input{width:auto}
+.filebtn{display:inline-block; cursor:pointer; font-family:var(--mono); font-weight:700; font-size:11px; letter-spacing:.5px; text-transform:uppercase; border:2px solid var(--ink); color:var(--ink); padding:5px 11px; background:transparent}
+.filebtn:active{transform:translate(1px,1px)}
+.filecount{font-size:11px; color:var(--ink-dim); margin-left:8px; letter-spacing:.5px}
 .comment{border-left:3px solid var(--ink); padding:6px 10px; margin:8px 0; background:#000}
 .comment .meta{font-size:10.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:1px}
 .delx{position:absolute; top:8px; right:10px}
@@ -238,10 +241,10 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
         <div class="spacer"></div>
         <textarea id="ntBody" placeholder="Co masz do powiedzenia?" maxlength="5000"></textarea>
         <div class="spacer"></div>
-        <label class="filepick">Zdjęcia (mini, opcjonalnie, do 4): <input type="file" id="ntImage" accept="image/*" multiple></label>
+        <div><label class="filebtn" for="ntImage">+ ZDJĘCIA</label><input type="file" id="ntImage" accept="image/*" multiple hidden><span class="filecount" id="ntImageCount"></span></div>
         <div class="spacer"></div>
-        <label id="ntGrzWrap" class="grzcheck hide"><input type="checkbox" id="ntGrz"> Widoczny tylko dla GRZBIETEK</label>
-        <label id="ntMordaWrap" class="grzcheck hide"><input type="checkbox" id="ntMorda"> Widoczny tylko dla MORDA</label>
+        <label id="ntGrzWrap" class="grzcheck hide"><input type="checkbox" id="ntGrz"> GT</label>
+        <label id="ntMordaWrap" class="grzcheck hide"><input type="checkbox" id="ntMorda"> MD</label>
         <div class="spacer"></div>
         <button class="btn" id="addThread">DODAJ WĄTEK</button>
       </div>
@@ -372,6 +375,11 @@ async function shrinkImage(file, maxBytes){
   if(!blob) return file;
   const base=(file.name||"foto").replace(/\.[^.]+$/,"")||"foto";
   return new File([blob], base+".jpg", {type:"image/jpeg"});
+}
+function imgCountLabel(n){
+  if(!n) return "";
+  const word = n===1?"zdjęcie":((n%10>=2&&n%10<=4)&&(n%100<10||n%100>=20))?"zdjęcia":"zdjęć";
+  return n>4 ? `wybrano ${n} — wgramy 4` : `${n} ${word}`;
 }
 // Wgrywa liste plikow (zmniejszajac kazdy), zwraca tablice publicznych URL-i.
 async function uploadImages(files, prefix, max){
@@ -568,6 +576,7 @@ $("#ntToggle").addEventListener("click",()=>{
   f.classList.toggle("hide", open);
   $("#ntToggle").textContent = open ? "+ DODAJ" : "ZWIŃ";
 });
+$("#ntImage").addEventListener("change",()=>{ $("#ntImageCount").textContent=imgCountLabel($("#ntImage").files.length); });
 function threadLimit(){ return profile?.is_admin?Infinity:(profile?.grzbietek?5:3); }
 function commentLimit(){ return profile?.is_admin?Infinity:(profile?.grzbietek?30:10); }
 async function dailyCount(table){
@@ -595,7 +604,7 @@ $("#addThread").addEventListener("click", async ()=>{
   if(image_urls.length) tpayload.image_urls=image_urls;
   const {data,error}=await sb.from("threads").insert(tpayload).select("grz_only,morda_only").single();
   if(error){ toast(friendlyErr(error)); return; }
-  $("#ntTitle").value=""; $("#ntBody").value=""; $("#ntGrz").checked=false; $("#ntMorda").checked=false; $("#ntImage").value="";
+  $("#ntTitle").value=""; $("#ntBody").value=""; $("#ntGrz").checked=false; $("#ntMorda").checked=false; $("#ntImage").value=""; $("#ntImageCount").textContent="";
   const tag = data?.grz_only&&data?.morda_only ? " — GRZBIETEK + MORDA" : data?.grz_only ? " — TYLKO GRZBIETEK" : data?.morda_only ? " — TYLKO MORDA" : "";
   toast("Wątek dodany"+tag+".");
   $("#ntForm").classList.add("hide"); $("#ntToggle").textContent="+ DODAJ";
@@ -697,7 +706,7 @@ async function loadThreads(){
       <div class="threadbar">
         <div class="tbleft">
           ${adminMode?`<span class="reorder"><button class="robtn" data-mv="up" data-id="${t.id}" title="W górę">▲</button><button class="robtn" data-mv="down" data-id="${t.id}" title="W dół">▼</button></span>`:""}
-          <button class="btn ghost sm" data-open="${t.id}">KOMENTARZE / ODPOWIEDZ</button>
+          <button class="btn ghost sm" data-open="${t.id}">ODP</button>
         </div>
         <div class="reactbar" id="react-${t.id}">${reactBarHtml(t.id, reMap[t.id])}</div>
       </div>
@@ -797,12 +806,14 @@ async function renderComments(id, box){
   h+=`<div class="row" style="margin-top:8px">
       <input id="ci-${id}" placeholder="Odpowiedz..." style="flex:1" maxlength="2000">
       <button class="btn sm" data-addc="${id}">WYŚLIJ</button></div>
-      <label class="filepick" style="margin-top:6px">Zdjęcia (mini, opcjonalnie, do 4): <input type="file" id="cimg-${id}" accept="image/*" multiple></label>
-      ${canGrz?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cg-${id}"> Tylko dla GRZBIETEK</label>`:""}
-      ${canMorda?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cm-${id}"> Tylko dla MORDA</label>`:""}`;
+      <div style="margin-top:6px"><label class="filebtn" for="cimg-${id}">+ ZDJĘCIA</label><input type="file" id="cimg-${id}" accept="image/*" multiple hidden><span class="filecount" id="fc-${id}"></span></div>
+      ${canGrz?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cg-${id}"> GT</label>`:""}
+      ${canMorda?`<label class="grzcheck" style="margin-top:6px"><input type="checkbox" id="cm-${id}"> MD</label>`:""}`;
   box.innerHTML=h;
   bindReactBar(box);
   bindEmbeds(box);
+  const fi=box.querySelector("#cimg-"+id), fc=box.querySelector("#fc-"+id);
+  if(fi&&fc) fi.addEventListener("change",()=>{ fc.textContent=imgCountLabel(fi.files.length); });
   box.querySelector("[data-addc]").onclick=async()=>{
     const v=box.querySelector("#ci-"+id).value.trim(); if(!v) return;
     const lim=commentLimit();
