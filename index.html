@@ -92,7 +92,7 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 .ytf.playing iframe{position:absolute; inset:0; width:100%; height:100%; border:0; display:block}
 .scf .playbtn{width:100%; text-align:center}
 .scf.playing iframe{display:block; width:100%; height:120px; border:2px solid var(--ink)}
-.playbtn{font-family:var(--mono); font-weight:700; font-size:13px; letter-spacing:1px; background:var(--ink); color:#000; border:2px solid var(--ink); padding:8px 14px; cursor:pointer; text-transform:uppercase}
+.playbtn{display:inline-block; text-decoration:none; font-family:var(--mono); font-weight:700; font-size:13px; letter-spacing:1px; background:var(--ink); color:#000; border:2px solid var(--ink); padding:8px 14px; cursor:pointer; text-transform:uppercase}
 .playbtn:active{transform:translate(-50%,-50%) translate(1px,1px)}
 .scf .playbtn:active{transform:translate(1px,1px)}
 .reactbar{display:flex; justify-content:flex-start; gap:8px; margin-top:10px}
@@ -433,9 +433,10 @@ function mediaEmbeds(raw){
     const yt=ytId(url);
     if(yt){
       html+=`<div class="embed ytf" data-yt="${esc(yt)}"><div class="thumb" style="background-image:url('https://i.ytimg.com/vi/${esc(yt)}/hqdefault.jpg')"></div><button class="playbtn" type="button">► PAL TO GÓWNO</button></div>`;
-    }else{
+    }else if(/soundcloud\.com/i.test(url)){
       const su=scUrl(url);
       if(su) html+=`<div class="embed scf" data-sc="${encodeURIComponent(su)}"><button class="playbtn" type="button">► PAL TO GÓWNO</button></div>`;
+      else html+=`<div class="embed"><a class="playbtn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">► OTWÓRZ NA SOUNDCLOUD</a></div>`;
     }
   }
   return html;
@@ -548,7 +549,7 @@ function onSignedOut(){
 function renderUserbar(){
   const ub=$("#userbar");
   if(!user){ ub.innerHTML=""; return; }
-  let html=`<span>Cześć, <b>${esc(profile?.nick||"?")}</b>${profile?.grzbietek?' <span class="badge g">GRZBIETEK</span>':''}${profile?.morda?' <span class="badge m">MORDA</span>':''}</span>`;
+  let html=`<span>Cześć, <b>${esc(profile?.nick||"?")}</b>${profile?.grzbietek?' <span class="badge g">GT</span>':''}${profile?.morda?' <span class="badge m">MD</span>':''}</span>`;
   if(profile?.is_admin){
     html+=`<button class="btn sm ${adminMode?'danger':'ghost'}" id="adminBtn">${adminMode?'● TRYB ADMINA':'TRYB ADMINA'}</button>`;
   }
@@ -634,24 +635,28 @@ async function loadReactGeneric(kind, id){
   (data||[]).forEach(x=>{ if(x.value===1)up++; else down++; if(x.user_id===user.id)mine=x.value; });
   return {up,down,mine};
 }
+const reactBusy=new Set();
 async function doReact(kind, id, value){
-  id=Number(id); const c=reactCfg(kind);
-  const cur=await loadReactGeneric(kind,id);
-  let err;
-  if(cur.mine===value){
-    ({error:err}=await sb.from(c.table).delete().eq(c.idcol,id).eq("user_id",user.id));
-  }else{
-    const row={user_id:user.id,value}; row[c.idcol]=id;
-    ({error:err}=await sb.from(c.table).upsert(row,{onConflict:c.idcol+",user_id"}));
-  }
-  if(err){ toast(friendlyErr(err)); return; }
-  const r=await loadReactGeneric(kind,id);
-  const el=document.getElementById(c.pre+id);
-  if(el){ el.innerHTML=reactBarHtml(id,r,kind); bindReactBar(el); }
+  id=Number(id); const c=reactCfg(kind); const key=kind+id;
+  if(reactBusy.has(key)) return; reactBusy.add(key);
+  try{
+    const cur=await loadReactGeneric(kind,id);
+    let err;
+    if(cur.mine===value){
+      ({error:err}=await sb.from(c.table).delete().eq(c.idcol,id).eq("user_id",user.id));
+    }else{
+      const row={user_id:user.id,value}; row[c.idcol]=id;
+      ({error:err}=await sb.from(c.table).upsert(row,{onConflict:c.idcol+",user_id"}));
+    }
+    if(err){ toast(friendlyErr(err)); return; }
+    const r=await loadReactGeneric(kind,id);
+    const el=document.getElementById(c.pre+id);
+    if(el){ el.innerHTML=reactBarHtml(id,r,kind); bindReactBar(el); }
+  } finally { reactBusy.delete(key); }
 }
 async function loadThreads(){
   let {data,error}=await sb.from("threads")
-    .select("id,title,body,created_at,author_id,grz_only,morda_only,image_url,image_urls,profiles!author_id(nick)")
+    .select("id,title,body,created_at,edited_at,author_id,grz_only,morda_only,image_url,image_urls,profiles!author_id(nick)")
     .order("created_at",{ascending:false});
   if(error){
     // np. kolumna image_url/image_urls jeszcze nie istnieje — wczytaj bez nich
@@ -698,8 +703,8 @@ async function loadThreads(){
     const imgsHtml = imgs.length ? `<div class="imgs">${imgs.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img class="timg" src="${esc(u)}" alt="" loading="lazy"></a>`).join("")}</div>` : "";
     el.innerHTML=`
       ${canDel?`<button class="btn sm danger delx" data-del="${t.id}">USUŃ</button>`:""}
-      <h3 data-open="${t.id}">${esc(t.title)} ${t.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${t.morda_only?'<span class="badge m">MORDA</span>':''}${activeSet.has(t.id)?BULB:''}</h3>
-      <div class="meta">${esc(t.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(t.created_at)}${mine?` · <a href="#" class="edt" data-edit="${t.id}">edytuj</a>`:""}</div>
+      <h3 data-open="${t.id}">${esc(t.title)} ${t.grz_only?'<span class="badge g">GT</span>':''}${t.morda_only?'<span class="badge m">MD</span>':''}${activeSet.has(t.id)?BULB:''}</h3>
+      <div class="meta">${esc(t.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(t.created_at)}${t.edited_at?' · edyt.':''}${mine?` · <a href="#" class="edt" data-edit="${t.id}">edytuj</a>`:""}</div>
       <div class="body">${bodyHtml}</div>
       ${mediaEmbeds(t.body)}
       ${imgsHtml}
@@ -760,7 +765,7 @@ async function editThread(id){
     const body=card.querySelector(".ed-body").value.trim();
     if(!title||!body){ toast("Tytuł i treść nie mogą być puste."); return; }
     if(title.length>23){ toast("Tytuł może mieć max 23 znaki."); return; }
-    const {error}=await sb.from("threads").update({title,body}).eq("id",id);
+    const {error}=await sb.from("threads").update({title,body,edited_at:new Date().toISOString()}).eq("id",id);
     if(error){ toast(friendlyErr(error)); return; }
     toast("Zapisano."); loadThreads();
   };
@@ -774,7 +779,7 @@ async function toggleComments(id){
 }
 async function renderComments(id, box){
   let {data,error}=await sb.from("comments")
-    .select("id,body,created_at,author_id,grz_only,morda_only,image_url,image_urls,profiles!author_id(nick)")
+    .select("id,body,created_at,edited_at,author_id,grz_only,morda_only,image_url,image_urls,profiles!author_id(nick)")
     .eq("thread_id",id).order("created_at",{ascending:true});
   if(error){
     ({data}=await sb.from("comments")
@@ -795,8 +800,8 @@ async function renderComments(id, box){
     const cimgs=(Array.isArray(c.image_urls)&&c.image_urls.length)?c.image_urls:(c.image_url?[c.image_url]:[]);
     const cimgsHtml=cimgs.length?`<div class="cimgs">${cimgs.map(u=>`<a href="${esc(u)}" target="_blank" rel="noopener"><img class="cimg" src="${esc(u)}" alt="" loading="lazy"></a>`).join("")}</div>`:"";
     h+=`<div class="comment" id="comment-${c.id}">
-      <div class="meta">${esc(c.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(c.created_at)}
-      ${c.grz_only?'<span class="badge g">GRZBIETEK</span>':''}${c.morda_only?'<span class="badge m">MORDA</span>':''}
+      <div class="meta">${esc(c.profiles?.nick||"[użytkownik usunięty]")} • ${timeStr(c.created_at)}${c.edited_at?' · edyt.':''}
+      ${c.grz_only?'<span class="badge g">GT</span>':''}${c.morda_only?'<span class="badge m">MD</span>':''}
       ${mine?`<a href="#" class="edt" data-editc="${c.id}"> [edytuj]</a>`:""}${canDel?`<a href="#" data-delc="${c.id}" style="color:var(--danger)"> [usuń]</a>`:""}</div>
       <div class="cbody">${linkify(c.body)}</div>
       ${mediaEmbeds(c.body)}
@@ -855,7 +860,7 @@ async function renderComments(id, box){
     node.querySelector("[data-savec]").onclick=async()=>{
       const nb=node.querySelector(".ed-body").value.trim();
       if(!nb){ toast("Treść nie może być pusta."); return; }
-      const {error}=await sb.from("comments").update({body:nb}).eq("id",cid);
+      const {error}=await sb.from("comments").update({body:nb,edited_at:new Date().toISOString()}).eq("id",cid);
       if(error){ toast(friendlyErr(error)); return; }
       toast("Zapisano."); renderComments(id, box);
     };
@@ -928,10 +933,16 @@ function openAdminPanel(){
     </div>
     <h3 style="margin-top:14px">UŻYTKOWNICY</h3>
     <div id="amUsers"><p class="muted">Wczytuję...</p></div>
-    <h3 style="margin-top:14px">WSZYSTKIE WĄTKI</h3>
+    <h3 style="margin-top:14px">WSZYSTKIE WĄTKI <button class="btn sm ghost" id="amResetOrder" style="vertical-align:middle">RESET KOLEJNOŚCI</button></h3>
     <div id="amThreads"><p class="muted">Wczytuję...</p></div>
   </div></div>`;
   $("#amClose").onclick=()=>root.innerHTML="";
+  const ro=$("#amResetOrder"); if(ro) ro.onclick=async()=>{
+    if(!confirm("Przywrócić kolejność wątków wg daty (najnowsze na górze)?")) return;
+    const {error}=await sb.from("settings").update({thread_order:[]}).eq("id",1);
+    if(error){ toast(friendlyErr(error)); return; }
+    settings.thread_order=[]; displayOrder=[]; toast("Kolejność zresetowana."); amLoadThreads(); loadThreads();
+  };
   $("#amLock").onclick=async()=>{
     const nv=!settings.threads_locked;
     const {error}=await sb.from("settings").update({threads_locked:nv}).eq("id",1);
@@ -947,8 +958,8 @@ async function amLoadUsers(){
     <div class="urow">
       <span class="nm">${esc(p.nick)}
         ${p.is_admin?'<span class="badge">admin</span>':''}
-        ${p.grzbietek?'<span class="badge g">grzbietek</span>':''}
-        ${p.morda?'<span class="badge m">morda</span>':''}
+        ${p.grzbietek?'<span class="badge g">GT</span>':''}
+        ${p.morda?'<span class="badge m">MD</span>':''}
         ${p.banned?'<span class="badge b">ban</span>':''}
         ${p.shadowbanned?'<span class="badge b">shadow</span>':''}</span>
       ${p.is_admin?'<span class="muted">to Ty</span>':`
@@ -986,7 +997,7 @@ async function amLoadThreads(){
   const box=$("#amThreads"); if(!box) return;
   box.innerHTML=(data).map(t=>`<div class="urow" style="flex-direction:column;align-items:stretch">
     <div class="row" style="justify-content:space-between">
-      <span class="nm">${esc(t.title)} ${t.grz_only?'<span class="badge g">grzbietek</span>':''}${t.morda_only?'<span class="badge m">morda</span>':''} <span class="muted">— ${esc(t.profiles?.nick||"?")}</span></span>
+      <span class="nm">${esc(t.title)} ${t.grz_only?'<span class="badge g">GT</span>':''}${t.morda_only?'<span class="badge m">MD</span>':''} <span class="muted">— ${esc(t.profiles?.nick||"?")}</span></span>
       <span class="reorder"><button class="robtn" data-mv="up" data-id="${t.id}" title="W górę">▲</button><button class="robtn" data-mv="down" data-id="${t.id}" title="W dół">▼</button></span>
     </div>
     <div class="row" style="margin-top:6px">
@@ -1022,7 +1033,7 @@ async function amToggleComments(tid){
   const {data}=await sb.from("comments").select("id,body,grz_only,morda_only,profiles!author_id(nick)").eq("thread_id",tid).order("created_at",{ascending:true});
   if(!data||!data.length){ c.innerHTML=`<p class="muted">Brak komentarzy.</p>`; return; }
   c.innerHTML=data.map(cm=>`<div class="comment">
-    <div class="meta">${esc(cm.profiles?.nick||"[usunięty]")} ${cm.grz_only?'<span class="badge g">grzbietek</span>':''}${cm.morda_only?'<span class="badge m">morda</span>':''}</div>
+    <div class="meta">${esc(cm.profiles?.nick||"[usunięty]")} ${cm.grz_only?'<span class="badge g">GT</span>':''}${cm.morda_only?'<span class="badge m">MD</span>':''}</div>
     <div>${esc(cm.body)}</div>
     <div class="row" style="margin-top:5px">
       <button class="btn sm ghost" data-cgrz="${cm.id}" data-v="${cm.grz_only?0:1}">${cm.grz_only?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
@@ -1137,9 +1148,9 @@ function typeCounts(){ const c={}; placed.forEach(b=>c[b.type]=(c[b.type]||0)+1)
 function updateSummary(){
   const el=$("#ssSummary"); if(!el) return;
   if(!placed.length){ el.textContent=""; return; }
-  const bb=bbox();
-  const cnt=Object.entries(typeCounts()).map(([k,n])=>`${k}×${n}`).join(", ");
-  el.textContent=`Wymiary stosu: ${bb.wCm} × ${bb.hCm} cm (szer. × wys.) · klocki: ${placed.length} (${cnt})`;
+  const bb=bbox(), tc=typeCounts();
+  const cnt=Object.keys(INVENTORY).map(k=>`${k} ${tc[k]||0}/${INVENTORY[k]}`).join(", ");
+  el.textContent=`Wymiary stosu: ${bb.wCm} × ${bb.hCm} cm (szer. × wys.) · użyto: ${cnt}`;
 }
 const cabImgCache={};
 function preloadCabImages(){
