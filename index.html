@@ -60,6 +60,7 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
 .brand h1{font-size:40px}
 .brand .tag{font-size:11px; color:var(--ink-dim); letter-spacing:3px; margin-top:2px}
 .topbtns{display:flex; gap:8px; flex-wrap:wrap; margin-top:11px}
+.topbtns .btn.on{background:var(--ink); color:#000}
 .userbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:13px}
 .tabs{display:flex; gap:0; margin-top:12px; border:2px solid var(--ink)}
 .tabs button{flex:1; background:transparent; color:var(--ink); border:0; border-right:2px solid var(--ink);
@@ -203,15 +204,12 @@ header{border-bottom:3px solid var(--ink); padding:12px 0 10px; position:relativ
       </div>
     </div>
     <div class="topbtns">
-      <a class="btn" id="fbBtn" target="_blank" rel="noopener">★ FACEBOOK</a>
+      <button class="btn ghost" data-tab="threads">≡ WĄTKI</button>
       <button class="btn ghost" data-tab="sound">▣ SOUNDSYSTEM</button>
+      <a class="btn ghost" id="fbBtn" target="_blank" rel="noopener">★ FACEBOOK</a>
       <button class="btn ghost" id="topBtn">◆ TOP</button>
     </div>
     <div class="userbar" id="userbar"></div>
-    <div class="tabs hide" id="tabs">
-      <button data-tab="threads" class="on">WĄTKI</button>
-      <button data-tab="sound">SOUNDSYSTEM</button>
-    </div>
   </header>
 
   <!-- ===== LOGOWANIE ===== -->
@@ -474,7 +472,7 @@ let booted=false, chatSub=null, canGrz=false, canMorda=false;
 /* ===================== ROUTING WIDOKÓW ===================== */
 function show(view){
   ["auth","threads","sound"].forEach(v=>$("#view-"+v).classList.toggle("hide", v!==view));
-  if($("#tabs")) [...document.querySelectorAll("#tabs button")].forEach(b=>b.classList.toggle("on", b.dataset.tab===view));
+  document.querySelectorAll(".topbtns [data-tab]").forEach(b=>b.classList.toggle("on", b.dataset.tab===view));
 }
 document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>{
   const t=b.dataset.tab;
@@ -542,7 +540,6 @@ async function onSignedIn(sess){
   await loadSettings();
   renderUserbar();
   updateGrzUI();
-  $("#tabs").classList.remove("hide");
   show("threads");
   loadThreads();
   initChat();
@@ -554,7 +551,6 @@ function updateGrzUI(){
 function onSignedOut(){
   user=null; profile=null; adminMode=false;
   if(chatSub){ sb.removeChannel(chatSub); chatSub=null; }
-  $("#tabs").classList.add("hide");
   $("#chatbar").classList.add("hide");
   renderUserbar();
   show("auth");
