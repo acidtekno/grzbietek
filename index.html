@@ -980,24 +980,33 @@ function openAdminPanel(){
   };
   amLoadUsers(); amLoadThreads();
 }
+let amOpenUser=null, amOpenThread=null;
 async function amLoadUsers(){
   const {data}=await sb.rpc("admin_users");
   const box=$("#amUsers"); if(!box) return;
   box.innerHTML=(data||[]).map(p=>`
-    <div class="urow">
-      <span class="nm">${esc(p.nick)}
+    <div class="urow" style="flex-direction:column;align-items:stretch">
+      <span class="nm uhead" data-uopen="${p.id}" style="cursor:pointer">${esc(p.nick)}
         ${p.is_admin?'<span class="badge">admin</span>':''}
         ${p.grzbietek?'<span class="badge g">GT</span>':''}
         ${p.morda?'<span class="badge m">MD</span>':''}
         ${p.banned?'<span class="badge b">ban</span>':''}
         ${p.shadowbanned?'<span class="badge b">shadow</span>':''}</span>
+      <div class="row uopts ${amOpenUser===p.id?'':'hide'}" id="uopt-${p.id}" style="margin-top:6px">
       ${p.is_admin?'<span class="muted">to Ty</span>':`
-        <button class="btn sm ghost" data-grz="${p.id}" data-v="${p.grzbietek?0:1}">${p.grzbietek?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
-        <button class="btn sm ghost" data-morda="${p.id}" data-v="${p.morda?0:1}">${p.morda?'ZDEJMIJ MORDA':'NADAJ MORDA'}</button>
+        <button class="btn sm ghost" data-grz="${p.id}" data-v="${p.grzbietek?0:1}">${p.grzbietek?'ZDEJMIJ GT':'NADAJ GT'}</button>
+        <button class="btn sm ghost" data-morda="${p.id}" data-v="${p.morda?0:1}">${p.morda?'ZDEJMIJ MD':'NADAJ MD'}</button>
         <button class="btn sm ghost" data-ban="${p.id}" data-v="${p.banned?0:1}">${p.banned?'ODBANUJ':'BAN'}</button>
         <button class="btn sm ghost" data-sh="${p.id}" data-v="${p.shadowbanned?0:1}">${p.shadowbanned?'COFNIJ SHADOW':'SHADOWBAN'}</button>
         <button class="btn sm danger" data-del="${p.id}">USUŃ KONTO</button>`}
+      </div>
     </div>`).join("");
+  box.querySelectorAll("[data-uopen]").forEach(h=>h.onclick=()=>{
+    const id=h.dataset.uopen;
+    amOpenUser = (amOpenUser===id) ? null : id;
+    box.querySelectorAll(".uopts").forEach(d=>d.classList.add("hide"));
+    if(amOpenUser){ const d=box.querySelector("#uopt-"+CSS.escape(id)); if(d) d.classList.remove("hide"); }
+  });
   box.querySelectorAll("[data-grz]").forEach(b=>b.onclick=()=>amUpd(b.dataset.grz,{grzbietek:!!+b.dataset.v}));
   box.querySelectorAll("[data-morda]").forEach(b=>b.onclick=()=>amUpd(b.dataset.morda,{morda:!!+b.dataset.v}));
   box.querySelectorAll("[data-ban]").forEach(b=>b.onclick=()=>amUpd(b.dataset.ban,{banned:!!+b.dataset.v}));
@@ -1026,17 +1035,26 @@ async function amLoadThreads(){
   const box=$("#amThreads"); if(!box) return;
   box.innerHTML=(data).map(t=>`<div class="urow" style="flex-direction:column;align-items:stretch">
     <div class="row" style="justify-content:space-between">
-      <span class="nm">${esc(t.title)} ${t.grz_only?'<span class="badge g">GT</span>':''}${t.morda_only?'<span class="badge m">MD</span>':''} <span class="muted">— ${esc(t.profiles?.nick||"?")}</span></span>
+      <span class="nm" data-topen="${t.id}" style="cursor:pointer">${esc(t.title)} ${t.grz_only?'<span class="badge g">GT</span>':''}${t.morda_only?'<span class="badge m">MD</span>':''}</span>
       <span class="reorder"><button class="robtn" data-mv="up" data-id="${t.id}" title="W górę">▲</button><button class="robtn" data-mv="down" data-id="${t.id}" title="W dół">▼</button></span>
     </div>
-    <div class="row" style="margin-top:6px">
-      <button class="btn sm ghost" data-tgrz="${t.id}" data-v="${t.grz_only?0:1}">${t.grz_only?'ZDEJMIJ GRZBIETEK':'NADAJ GRZBIETEK'}</button>
-      <button class="btn sm ghost" data-tmorda="${t.id}" data-v="${t.morda_only?0:1}">${t.morda_only?'ZDEJMIJ MORDA':'NADAJ MORDA'}</button>
-      <button class="btn sm ghost" data-tc="${t.id}">KOMENTARZE</button>
-      <button class="btn sm danger" data-dt="${t.id}">USUŃ WĄTEK</button>
+    <div class="topts ${amOpenThread===t.id?'':'hide'}" id="topt-${t.id}">
+      <div class="muted" style="margin-top:4px">autor: ${esc(t.profiles?.nick||"?")}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn sm ghost" data-tgrz="${t.id}" data-v="${t.grz_only?0:1}">${t.grz_only?'ZDEJMIJ GT':'NADAJ GT'}</button>
+        <button class="btn sm ghost" data-tmorda="${t.id}" data-v="${t.morda_only?0:1}">${t.morda_only?'ZDEJMIJ MD':'NADAJ MD'}</button>
+        <button class="btn sm ghost" data-tc="${t.id}">KOMENTARZE</button>
+        <button class="btn sm danger" data-dt="${t.id}">USUŃ WĄTEK</button>
+      </div>
     </div>
     <div class="hide" id="amc-${t.id}" style="margin-top:6px"></div>
   </div>`).join("") || `<p class="muted">Brak.</p>`;
+  box.querySelectorAll("[data-topen]").forEach(h=>h.onclick=()=>{
+    const id=Number(h.dataset.topen);
+    amOpenThread = (amOpenThread===id) ? null : id;
+    box.querySelectorAll(".topts").forEach(d=>d.classList.add("hide"));
+    if(amOpenThread){ const d=box.querySelector("#topt-"+id); if(d) d.classList.remove("hide"); }
+  });
   box.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveThread(Number(b.dataset.id), b.dataset.mv==="up"?-1:1));
   box.querySelectorAll("[data-dt]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Usunąć wątek?")) return;
